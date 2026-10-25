@@ -977,6 +977,7 @@ const ACT = {
   rsave: () => saveRecur(),
   rdel: () => { const id = S.R.id; dialog('Xoá khoản định kỳ?', 'Các khoản đã ghi trong sổ vẫn giữ nguyên, chỉ dừng tạo khoản mới.', 'Xoá', async () => { S.set.recurring = S.set.recurring.filter(r => r.id !== id); await saveSet(); closeSheet(); renderAll(); toast('Đã xoá khoản định kỳ'); }, true); },
   rmanage: () => { setTab('settings'); setTimeout(() => $('#recur-card')?.scrollIntoView({ block: 'start' }), 50); },
+  reload: () => location.reload(),
   syncnow: () => syncInbox(true),
   monthgo: () => { S.lm = 'month'; S.lmk = mkey(new Date()); S.lcat = ''; S.q = ''; renderLog(); setTab('log'); },
   goq: () => $('#pending')?.scrollIntoView({ behavior: 'smooth', block: 'center' }),
@@ -1116,7 +1117,17 @@ async function init() {
   document.addEventListener('visibilitychange', () => { if (!document.hidden) { processQueue(); syncInbox(false); runRecurring().then(n => { renderAll(); if (n) toast(`Đã ghi ${n} khoản định kỳ đến hạn`); }); } });
   processQueue(); syncInbox(false);
   if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
-    navigator.serviceWorker.register('sw.js').catch(() => {});
+    const had = !!navigator.serviceWorker.controller;
+    navigator.serviceWorker.register('sw.js').then(reg => {
+      const check = () => reg.update().catch(() => {});
+      document.addEventListener('visibilitychange', () => { if (!document.hidden) check(); });
+      setInterval(check, 30 * 60 * 1000);
+    }).catch(() => {});
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (!had) return;
+      el.toast.innerHTML = '<span>Có bản mới</span><button data-act="reload">Tải lại</button>';
+      el.toast.classList.add('on'); clearTimeout(toastT);
+    });
   }
 }
 init();

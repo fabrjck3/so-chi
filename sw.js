@@ -1,5 +1,5 @@
 // Service worker: ưu tiên mạng, mất mạng thì dùng bản đã lưu. Đổi VERSION mỗi lần sửa file để xoá cache cũ.
-const VERSION = 'so-chi-v10';
+const VERSION = 'so-chi-v11';
 const SHELL = [
   './', './index.html', './manifest.webmanifest', './css/app.css',
   './js/app.js', './js/db.js', './js/parse.js', './js/ai.js', './js/sync.js',
@@ -21,7 +21,7 @@ self.addEventListener('fetch', e => {
   const req = e.request;
   if (req.method !== 'GET' || new URL(req.url).origin !== location.origin) return;
   e.respondWith(
-    fetch(req).then(res => {
+    fetch(req, { cache: 'no-cache' }).then(res => { // luôn hỏi lại máy chủ, không dùng bản trong bộ nhớ đệm HTTP (GitHub Pages giữ 10 phút)
       if (res.ok) { const copy = res.clone(); caches.open(VERSION).then(c => c.put(req, copy)); }
       return res;
     }).catch(() => caches.match(req, { ignoreSearch: true }).then(r => r || caches.match('./index.html')))
