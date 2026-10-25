@@ -43,7 +43,7 @@ const ICON_BY_NAME = { 'an uong': 'food', 'ca phe': 'cafe', 'di lai': 'move', 'h
 const badge = (name, color, force) => `<span class="ic" style="background:${color}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[force || ICON_BY_NAME[norm(name || '')] || 'other']}</svg></span>`;
 const DEF_SET = {
   budget: 6000000, dailyBudget: 0, recurring: [], sync: { url: '', token: '' }, bankBal: null, lastBal: null, seen: [], lastSync: null, categories: DEF_CATS, open: { bank: 0, cash: 0 }, apiKey: '', model: 'claude-haiku-5-5',
-  ai: true, defWallet: 'cash', theme: 'auto', lastBackup: null, learned: {}, welcomed: false,
+  ai: true, autosave: true, defWallet: 'cash', theme: 'auto', lastBackup: null, learned: {}, welcomed: false,
 };
 
 const S = { lm: 'day', ld: ymd(new Date()), lmk: mkey(new Date()), lcat: '', q: '', tx: [], set: null, queue: [], tab: 'home', month: mkey(new Date()), wf: 'all', busy: false, C: null, pill: {} };
@@ -194,15 +194,16 @@ function renderHome() {
   S.pill.home = remain < 0 ? `Vượt ${fmtS(-remain)}` : `Còn ${fmtS(remain)}`;
   const b = balances(), tot = b.bank + b.cash, todayS = ymd(now), ydS = ymd(addDays(now, -1));
   const tone = over ? 'coral' : pct >= .8 ? 'amber' : 'emerald', status = over ? 'Vượt mức' : pct >= .8 ? 'Sát mức' : 'Đang tốt';
-  const ready = S.queue.filter(q => q.status === 'ready');
+  const pend = S.queue.filter(q => ['ready', 'wait', 'error'].includes(q.status));
+  const ready = pend.filter(q => q.status === 'ready');
   const lim = dayLimit(info.dim);
 
   let html = `<div class="bx"><header class="bx-head"><div><p>${WDN[now.getDay()]}, ${d} tháng ${now.getMonth() + 1}</p><h1>Hôm nay</h1></div><button class="bx-avatar" data-act="tab" data-tab="settings" aria-label="Cài đặt">${bxIc('user')}</button></header>`;
   if (!S.tx.length && !S.set.welcomed) {
     html += `<section class="bx-glass emerald" style="padding:16px"><div class="bx-eye"><span class="bx-dot"></span>Chào bạn</div><p class="sm" style="margin:8px 0 12px">Nhấn nút + rồi nhập số tiền, hoặc chọn "Nhập bằng lời" để gõ "45k phở". Muốn xem app với số liệu đầy đủ thì tạo dữ liệu mẫu.</p><div class="row2"><button class="btn" data-act="sample">Xem dữ liệu mẫu</button><button class="btn ghost" data-act="welcomed">Bắt đầu trống</button></div></section>`;
   }
-  if (S.queue.length) {
-    html += `<button class="bx-banner" data-act="goq"><span><b>${ready.length ? ready.length + ' khoản chờ xác nhận' : S.queue.length + ' câu chờ xử lý'}</b> · chạm để xem</span><span class="bx-badge amber">${ready.length ? 'Xác nhận' : 'Chờ mạng'}</span></button>`;
+  if (pend.length) {
+    html += `<button class="bx-banner" data-act="goq"><span><b>${ready.length ? ready.length + ' khoản chờ xác nhận' : pend.length + ' câu chờ xử lý'}</b> · chạm để xem</span><span class="bx-badge amber">${ready.length ? 'Xác nhận' : 'Chờ mạng'}</span></button>`;
   }
 
   // 1. thẻ số dư
@@ -245,9 +246,9 @@ function renderHome() {
     <div class="bx-plot"><div class="bx-limit" style="bottom:${lim / scale * H + 22}px"><em>${fmtS(lim)}</em></div>
       ${days.map((x, i) => `<div class="bx-col ${i === 6 ? 'now' : ''}" data-act="day" data-d="${x.ds}"><span class="v">${x.v ? fmtS(x.v) : ''}</span><div class="b" style="height:${x.v ? Math.max(4, x.v / scale * H) : 0}px"></div><span class="d">${['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'][x.dt.getDay()]}</span></div>`).join('')}</div></section>`;
 
-  if (S.queue.length) {
+  if (pend.length) {
     html += `<section class="bx-glass bx-list amber" id="pending"><div class="bx-lh"><span class="bx-eye"><span class="bx-dot"></span>Chờ xác nhận</span><span class="bx-badge">${ready.length ? ready.length + ' sẵn sàng' : 'chờ mạng'}</span></div>` +
-      S.queue.map(q => q.status === 'ready'
+      pend.map(q => q.status === 'ready'
         ? `<button class="li" data-act="qopen" data-id="${q.id}"><div class="n"><b>${esc(q.text)}</b><span>Chạm để chọn danh mục và lưu</span></div><span class="chip">Xác nhận</span></button>`
         : `<div class="li"><div class="n"><b>${esc(q.text)}</b><span>${q.status === 'error' ? esc(q.error || 'Không hiểu được') : 'Chờ có mạng để xử lý'}</span></div><button class="link" data-act="qdel" data-id="${q.id}">Xoá</button></div>`).join('') + `</section>`;
   }
@@ -562,7 +563,7 @@ function renderSettings() {
   <div class="sec"><span>Danh mục</span></div>
   <div class="group">${s.categories.map((c, i) => `<div class="srow"><input type="color" class="swatch" data-cat="color" data-i="${i}" value="${c.color}" aria-label="Màu ${esc(c.name)}"><input class="grow" data-cat="name" data-i="${i}" value="${esc(c.name)}" aria-label="Tên danh mục" style="text-align:left"><input class="bud" inputmode="numeric" data-cat="budget" data-i="${i}" placeholder="Ngân sách" value="${fmtNum(c.budget)}" aria-label="Ngân sách ${esc(c.name)}"><button class="x" data-act="catdel" data-i="${i}" aria-label="Xoá danh mục">×</button></div>`).join('')}${act('Thêm danh mục', 'catadd', '', '+')}</div>
   <div class="sec"><span>Nhập bằng lời</span></div>
-  <div class="group">${row('API key', `<input id="s-key" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" data-set="apiKey" value="${esc(s.apiKey)}" placeholder="sk-ant-...">`)}${row('Model', `<input id="s-model" data-set="model" value="${esc(s.model)}" autocapitalize="off" spellcheck="false">`)}${row('Dùng API khi cần', `<input type="checkbox" id="s-ai" data-set="ai" ${s.ai ? 'checked' : ''}>`)}${act('Kiểm tra kết nối', 'testkey')}</div>
+  <div class="group">${row('API key', `<input id="s-key" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" data-set="apiKey" value="${esc(s.apiKey)}" placeholder="sk-ant-...">`)}${row('Model', `<input id="s-model" data-set="model" value="${esc(s.model)}" autocapitalize="off" spellcheck="false">`)}${row('Dùng API khi cần', `<input type="checkbox" id="s-ai" data-set="ai" ${s.ai ? 'checked' : ''}>`)}${row('Tự lưu khi chắc chắn', `<input type="checkbox" id="s-auto" data-set="autosave" ${s.autosave !== false ? 'checked' : ''}>`)}${act('Kiểm tra kết nối', 'testkey')}</div>
   <div class="foot" id="keymsg">Câu đơn giản app tự hiểu trên máy. Câu phức tạp mới gửi lên Anthropic, chỉ gồm câu bạn gõ, ngày hôm nay và tên danh mục. Key chỉ lưu trên máy này, không nằm trong bản sao lưu.</div>
   <div class="sec"><span>Tin nhắn ngân hàng</span></div>
   <div class="group">${row('Địa chỉ Worker', `<input id="s-wurl" data-set="sync.url" inputmode="url" autocapitalize="off" spellcheck="false" placeholder="https://..." value="${esc(s.sync?.url || '')}">`)}${row('Mã đồng bộ', `<input id="s-wtok" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" data-set="sync.token" value="${esc(s.sync?.token || '')}">`)}${act('Đồng bộ ngay', 'syncnow')}</div>
@@ -581,13 +582,14 @@ function renderAll() { renderHome(); renderLog(); renderStats(); renderWallet();
 function renderAllExceptSettings() { renderHome(); renderLog(); renderStats(); renderWallet(); updatePill(); }
 
 /* ---------- sheet ---------- */
-function openSheet(html, mount) {
+function openSheet(html, mount, cls = '') {
+  S.chat = cls === 'chat';
   el.sheet.innerHTML = '<div class="grab"></div>' + html;
-  el.sheet.classList.add('on'); el.scrim.classList.add('on'); el.sheet.scrollTop = 0;
+  el.sheet.className = 'sheet on' + (cls ? ' ' + cls : ''); el.scrim.classList.add('on'); el.sheet.scrollTop = 0;
   mount?.(el.sheet);
 }
 function closeSheet() {
-  el.sheet.classList.remove('on'); el.scrim.classList.remove('on'); S.C = null;
+  el.sheet.classList.remove('on'); el.scrim.classList.remove('on'); S.C = null; S.chat = false;
   if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur();
 }
 let toastT;
@@ -627,73 +629,139 @@ async function kpSave() {
   await load(); closeSheet(); renderAll(); toast('Đã lưu ' + fmt(amount));
 }
 
-/* nhập bằng lời */
-
-function openEntry(prefill = '', msg = '') {
-  openSheet(`<h2>Bạn chi gì?</h2>
-    <div class="field"><textarea class="inp" id="q" rows="3" placeholder="45k phở · hôm qua grab 62k bằng thẻ · rút 2tr ATM" aria-label="Câu nhập">${esc(prefill)}</textarea></div>
-    <div class="sm" id="qmsg" style="margin-bottom:12px;min-height:34px">${msg || 'Nói hoặc gõ một câu, hoặc dán nguyên tin nhắn biến động số dư của ngân hàng. Tin ngân hàng được đọc ngay trên máy.'}</div>
-    <button class="btn" id="qgo" data-act="understand">Hiểu giúp tôi</button><div style="height:8px"></div><div class="row2"><button class="btn ghost" data-act="paste">Dán tin nhắn</button><button class="btn ghost" data-act="manual">Nhập tay</button></div><button class="link" style="display:block;margin:10px auto 0" data-act="kp">Dùng bàn phím số</button>`, sh => {
-    const q = $('#q', sh); q.focus();
-    q.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); understand(); } });
-  });
+/* nhập bằng lời: gửi tin nhắn, xử lý ở nền, xem lại như đoạn chat */
+const AUTO_OK = 0.8;
+const hhmm = t => new Date(t).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+const sgnAmt = it => (it.type === 'thu' ? '+' : it.type === 'chuyen' ? '' : '−') + fmt(it.amount);
+const cbLine = (it, id) => {
+  const mid = it.type === 'chuyen' ? `${W[it.wallet]} → ${W[it.toWallet]}` : `${esc(it.note || it.category)} · ${esc(it.category)} · ${W[it.wallet]}`;
+  const inner = `<span>${mid}<br><em>${dlabel(it.date)}</em></span><b class="${it.type === 'thu' ? 'in' : ''}">${sgnAmt(it)}</b>`;
+  return id ? `<button class="cb-line" data-act="edit" data-id="${id}">${inner}</button>` : `<div class="cb-line">${inner}</div>`;
+};
+function chatBubble(q) {
+  const me = `<div class="cb-me">${q.kind === 'sms' ? esc(q.text) : esc(q.text)}<span class="cb-time">${hhmm(q.createdAt)}</span></div>`;
+  const items = q.items || [];
+  let ai = '';
+  if (q.status === 'processing') ai = `<div class="cb-ai"><span class="spin"></span>Đang xử lý...</div>`;
+  else if (q.status === 'wait') ai = `<div class="cb-ai">Chờ có mạng để xử lý.<div class="cb-acts"><button data-act="qretry" data-id="${q.id}">Thử lại</button><button data-act="qdel" data-id="${q.id}">Xoá</button></div></div>`;
+  else if (q.status === 'error') ai = `<div class="cb-ai"><span class="bad">${esc(q.error || 'Không hiểu được câu này.')}</span><div class="cb-acts"><button data-act="qretry" data-id="${q.id}">Thử lại</button><button data-act="manual">Nhập tay</button><button data-act="qdel" data-id="${q.id}">Xoá</button></div></div>`;
+  else if (q.status === 'ready') ai = `<div class="cb-ai warn"><b>Cần bạn xác nhận</b>${items.map(it => cbLine(it)).join('')}${items.find(it => it.ambiguity) ? `<div class="cb-hint">${esc(items.find(it => it.ambiguity).ambiguity)}</div>` : ''}<div class="cb-acts"><button class="pri" data-act="qopen" data-id="${q.id}">Xác nhận</button><button data-act="qdel" data-id="${q.id}">Bỏ</button></div></div>`;
+  else if (q.status === 'saved') {
+    const txs = (q.txIds || []).map(id => S.tx.find(t => t.id === id)).filter(Boolean);
+    ai = txs.length
+      ? `<div class="cb-ai ok"><b>Đã lưu</b>${txs.map(t => cbLine(t, t.id)).join('')}<div class="cb-acts"><button data-act="qundo" data-id="${q.id}">Hoàn tác</button></div></div>`
+      : `<div class="cb-ai"><span class="sm">Đã lưu, nhưng khoản này sau đó đã bị xoá.</span></div>`;
+  } else if (q.status === 'undone') ai = `<div class="cb-ai"><span class="sm">Đã hoàn tác.</span><div class="cb-acts"><button data-act="qopen" data-id="${q.id}">Xác nhận lại</button></div></div>`;
+  return me + ai;
 }
-async function understand() {
+function chatLogHTML() {
+  const list = [...S.queue].sort((a, b) => a.createdAt - b.createdAt).slice(-40);
+  if (!list.length) return `<div class="cb-empty">Gõ một câu như "45k phở" hay "hôm qua grab 62k bằng thẻ". App tự hiểu và lưu ở nền, bạn không cần chờ. Mọi câu đã gửi nằm lại ở đây để xem lại.</div>`;
+  let last = '';
+  return list.map(q => {
+    const d = ymd(new Date(q.createdAt)), sep = d !== last ? `<div class="cb-day">${dlabel(d)}</div>` : ''; last = d;
+    return sep + chatBubble(q);
+  }).join('');
+}
+function refreshChat() {
+  if (!S.chat || !el.sheet.classList.contains('on')) return;
+  const log = $('#chatlog'); if (!log) return;
+  const stick = log.scrollHeight - log.scrollTop - log.clientHeight < 80;
+  log.innerHTML = chatLogHTML();
+  if (stick) log.scrollTop = log.scrollHeight;
+}
+function openEntry() {
+  openSheet(`<div class="chat-h"><h2>Nhập chi tiêu</h2><div class="chat-tools"><button class="link" data-act="kp">Bàn phím số</button><button class="link" data-act="manual">Nhập tay</button></div></div>
+    <div class="chat-log" id="chatlog">${chatLogHTML()}</div>
+    <div class="chat-in"><button class="clip" data-act="paste" aria-label="Dán tin nhắn ngân hàng"><svg viewBox="0 0 24 24"><path d="M9 4h6v3H9zM7 6H6a1 1 0 0 0-1 1v13a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V7a1 1 0 0 0-1-1h-1"/></svg></button>
+      <textarea class="inp" id="q" rows="1" placeholder="Gõ một câu, ví dụ 45k phở" aria-label="Câu nhập"></textarea>
+      <button class="send" data-act="send" aria-label="Gửi"><svg viewBox="0 0 24 24"><path d="M12 19V5M6 11l6-6 6 6"/></svg></button></div>`, sh => {
+    const log = $('#chatlog', sh); log.scrollTop = log.scrollHeight;
+    const q = $('#q', sh); q.focus();
+    q.addEventListener('input', () => { q.style.height = 'auto'; q.style.height = Math.min(110, q.scrollHeight) + 'px'; });
+    q.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendFromInput(); } });
+  }, 'chat');
+}
+function sendFromInput() {
   const q = $('#q'); if (!q) return;
   const text = q.value.trim(); if (!text) return;
-  const msg = $('#qmsg'), go = $('#qgo');
-  const now = new Date();
-  const sms = parseBankSMS(text, { today: now, categories: S.set.categories, learned: S.set.learned });
-  if (sms.items.length) {
-    sms.items.forEach(it => {
-      if (S.tx.some(t => t.date === it.date && t.amount === it.amount && t.type === it.type && t.wallet === 'bank' && !t.recur)) {
-        it.confidence = 0.6; it.ambiguity = 'Có thể trùng với khoản đã ghi, kiểm tra trước khi lưu';
-      }
-    });
-    openConfirm({ items: sms.items, title: `Từ tin nhắn ngân hàng: ${sms.items.length} giao dịch`, hint: 'Đọc ngay trên máy, không gửi đi đâu. Số tài khoản và số dư không được lưu.' });
-    return;
-  }
-  const local = parseLocal(text, { today: now, categories: S.set.categories, learned: S.set.learned, defWallet: S.set.defWallet });
-  if (local?.certain) { openConfirm({ items: local.items, text }); return; }
-  const hasLocal = !!local?.items.length;
-  const canAI = S.set.ai && S.set.apiKey;
-  if (canAI && navigator.onLine) {
-    go.disabled = true; msg.innerHTML = '<span class="spin"></span>Đang hiểu câu của bạn...';
-    try {
-      const items = await parseWithAI(text, { apiKey: S.set.apiKey, model: S.set.model, categories: catNames(), today: now });
-      openConfirm({ items, text }); return;
-    } catch (e) {
-      go.disabled = false;
-      if (hasLocal) { openConfirm({ items: local.items, text, hint: 'Không gọi được API (' + e.message + '), tạm hiểu trên máy. Kiểm tra kỹ nhé.' }); return; }
-      if (e.kind === 'network') { await enqueue(text); closeSheet(); return; }
-      msg.innerHTML = `<span class="bad">${esc(e.message)}</span>`; return;
-    }
-  }
-  if (hasLocal) { openConfirm({ items: local.items, text, hint: canAI ? 'Đang mất mạng, tạm hiểu trên máy.' : null }); return; }
-  if (canAI) { await enqueue(text); closeSheet(); return; }
-  msg.innerHTML = '<span class="bad">Câu này cần API key để hiểu. Dán key ở Cài đặt, hoặc bấm "Nhập tay".</span>';
+  q.value = ''; q.style.height = 'auto'; q.focus();
+  sendMessage(text);
 }
-async function enqueue(text) {
-  const q = { id: DB.uid(), text, createdAt: Date.now(), today: ymd(new Date()), status: 'wait' };
-  await DB.put('queue', q); S.queue.push(q); renderHome();
-  toast('Đã xếp hàng, sẽ xử lý khi có mạng');
+async function sendMessage(text) {
+  const q = { id: DB.uid(), kind: 'chat', text, createdAt: Date.now(), today: ymd(new Date()), status: 'processing' };
+  await DB.put('queue', q); S.queue.push(q);
+  refreshChat(); renderHome();
+  processEntry(q); // chạy ở nền, không chờ
+}
+async function commitItems(items) {
+  const now = Date.now();
+  const rows = items.map((it, k) => ({
+    id: DB.uid(), type: it.type, date: it.date, amount: Math.round(it.amount), wallet: it.wallet,
+    toWallet: it.type === 'chuyen' ? it.toWallet : null, category: it.type === 'chuyen' ? 'Chuyển ví' : it.category,
+    note: (it.note || '').trim(), createdAt: now + k,
+  }));
+  rows.forEach(r => {
+    if (r.type === 'chi' && r.note) {
+      const key = norm(r.note).replace(/[^a-z0-9]+/g, ' ').trim();
+      if (key.length >= 2 && key.length <= 30) S.set.learned[key] = r.category;
+    }
+  });
+  const lk = Object.keys(S.set.learned); if (lk.length > 300) delete S.set.learned[lk[0]];
+  await DB.putMany('tx', rows); await saveSet();
+  return rows;
+}
+async function processEntry(q) {
+  const today = pd(q.today);
+  const ctx = { today, categories: S.set.categories, learned: S.set.learned, defWallet: S.set.defWallet };
+  const canAI = S.set.ai && S.set.apiKey;
+  let items = null;
+  const sms = parseBankSMS(q.text, ctx);
+  if (sms.items.length) {
+    items = sms.items;
+    items.forEach(it => {
+      if (S.tx.some(t => t.date === it.date && t.amount === it.amount && t.type === it.type && t.wallet === 'bank' && !t.recur)) { it.confidence = 0.6; it.ambiguity = 'Có thể trùng với khoản đã ghi, kiểm tra trước khi lưu'; }
+    });
+  } else {
+    const local = parseLocal(q.text, ctx);
+    if (local?.certain) items = local.items;
+    else if (canAI && navigator.onLine) {
+      try { items = await parseWithAI(q.text, { apiKey: S.set.apiKey, model: S.set.model, categories: catNames(), today }); }
+      catch (e) {
+        if (local?.items.length) { items = local.items; items.forEach(it => { it.ambiguity = it.ambiguity || 'Không gọi được API, tạm hiểu trên máy'; it.confidence = Math.min(it.confidence, .6); }); }
+        else if (e.kind === 'network') q.status = 'wait';
+        else { q.status = 'error'; q.error = e.message; }
+      }
+    } else if (canAI) {
+      if (local?.items.length) { items = local.items; items.forEach(it => { it.ambiguity = 'Đang mất mạng, tạm hiểu trên máy'; it.confidence = Math.min(it.confidence, .6); }); }
+      else q.status = 'wait';
+    } else if (local?.items.length) items = local.items;
+    else { q.status = 'error'; q.error = 'Câu này cần API key để hiểu. Dán key ở Cài đặt, hoặc bấm "Nhập tay".'; }
+  }
+  if (items) {
+    q.items = items;
+    const sure = S.set.autosave !== false && items.every(it => it.confidence >= AUTO_OK && !it.ambiguity && it.amount > 0 && it.date <= ymd(addDays(new Date(), 1)));
+    if (sure) {
+      const rows = await commitItems(items);
+      q.status = 'saved'; q.txIds = rows.map(r => r.id);
+    } else q.status = 'ready';
+  }
+  await DB.put('queue', q);
+  await load(); renderAll(); refreshChat();
+  if (q.status === 'saved' && !S.chat) toast(`Đã lưu ${q.items.map(sgnAmt).join(', ')}`, () => ACT.qundo({ dataset: { id: q.id } }));
+  else if (q.status === 'ready' && !S.chat) toast('Có khoản cần bạn xác nhận');
 }
 async function processQueue() {
-  if (S.busy || !navigator.onLine || !S.set?.apiKey || !S.set.ai) return;
+  if (S.busy || !navigator.onLine) return;
   const todo = S.queue.filter(q => q.status === 'wait');
   if (!todo.length) return;
   S.busy = true;
   for (const q of todo) {
-    try {
-      q.items = await parseWithAI(q.text, { apiKey: S.set.apiKey, model: S.set.model, categories: catNames(), today: pd(q.today) });
-      q.status = 'ready';
-    } catch (e) {
-      if (e.kind === 'network') break;
-      q.status = 'error'; q.error = e.message;
-    }
-    await DB.put('queue', q);
+    q.status = 'processing'; await DB.put('queue', q); refreshChat();
+    await processEntry(q);
+    if (q.status === 'wait') break;
   }
-  S.busy = false; renderHome();
+  S.busy = false; renderHome(); refreshChat();
 }
 
 /* đồng bộ tin ngân hàng từ Worker */
@@ -805,7 +873,10 @@ async function saveConfirm() {
   });
   const lk = Object.keys(S.set.learned); if (lk.length > 300) delete S.set.learned[lk[0]];
   await DB.putMany('tx', rows); await saveSet();
-  if (C.queueId) { await DB.del('queue', C.queueId); S.queue = S.queue.filter(q => q.id !== C.queueId); }
+  if (C.queueId) {
+    const qe = S.queue.find(q => q.id === C.queueId);
+    if (qe) { qe.status = 'saved'; qe.items = C.items.map(x => ({ ...x })); qe.txIds = rows.map(r => r.id); await DB.put('queue', qe); }
+  }
   const n = rows.length;
   await load(); closeSheet(); renderAll(); toast(C.mode === 'edit' ? 'Đã lưu' : `Đã lưu ${n} khoản`);
 }
@@ -995,11 +1066,16 @@ const ACT = {
   lmnext: () => { const [y, m] = S.lmk.split('-').map(Number); const n = mkey(new Date(y, m, 1)); if (n <= mkey(new Date())) { S.lmk = n; renderLog(); } },
   lcat: b => { S.lcat = b.dataset.c; renderLog(); },
   close: () => closeSheet(),
-  understand: () => understand(),
+  send: () => sendFromInput(),
   paste: async () => {
-    const q = $('#q'); if (!q) return;
-    try { q.value = await navigator.clipboard.readText(); understand(); }
-    catch { $('#qmsg').innerHTML = '<span class="bad">Không đọc được bộ nhớ tạm. Hãy giữ ô nhập và chọn Dán.</span>'; }
+    try { const t = (await navigator.clipboard.readText()).trim(); if (t) sendMessage(t); else toast('Bộ nhớ tạm đang trống'); }
+    catch { toast('Không đọc được bộ nhớ tạm. Hãy giữ ô nhập và chọn Dán.'); }
+  },
+  qretry: async b => { const q = S.queue.find(x => x.id === b.dataset.id); if (!q) return; q.status = 'processing'; q.error = ''; await DB.put('queue', q); refreshChat(); processEntry(q); },
+  qundo: async b => {
+    const q = S.queue.find(x => x.id === b.dataset.id); if (!q) return;
+    await DB.delMany('tx', q.txIds || []); q.status = 'undone'; q.txIds = []; await DB.put('queue', q);
+    await load(); renderAll(); refreshChat(); toast('Đã hoàn tác');
   },
   manual: () => openConfirm({ items: [blankItem()], title: 'Nhập tay' }),
   edit: b => { const t = S.tx.find(x => x.id === b.dataset.id); if (t) openConfirm({ items: [{ ...t, confidence: 1, ambiguity: null }], mode: 'edit', editId: t.id }); },
@@ -1018,7 +1094,7 @@ const ACT = {
   adjust: () => openAdjust(),
   adjok: () => applyAdjust(),
   qopen: b => { const q = S.queue.find(x => x.id === b.dataset.id); if (q) openConfirm({ items: q.items, text: q.text, queueId: q.id }); },
-  qdel: async b => { await DB.del('queue', b.dataset.id); S.queue = S.queue.filter(q => q.id !== b.dataset.id); renderHome(); },
+  qdel: async b => { await DB.del('queue', b.dataset.id); S.queue = S.queue.filter(q => q.id !== b.dataset.id); renderHome(); refreshChat(); },
   sample: () => makeSample(),
   welcomed: async () => { S.set.welcomed = true; await saveSet(); renderHome(); },
   unsample: async () => { const ids = S.tx.filter(t => t.sample).map(t => t.id); await DB.delMany('tx', ids); const qids = S.queue.filter(q => q.sample).map(q => q.id); if (qids.length) { await DB.delMany('queue', qids); S.queue = S.queue.filter(q => !q.sample); } S.set.recurring = S.set.recurring.filter(r => !r.sample); await saveSet(); await load(); renderAll(); toast(`Đã xoá ${ids.length} khoản mẫu`); },
@@ -1097,6 +1173,7 @@ async function init() {
     sheet: $('#sheet'), scrim: $('#scrim'), toast: $('#toast'), pill: $('#pill'), file: $('#file'),
   });
   try { await load(); } catch { document.body.textContent = 'Không mở được bộ nhớ của trình duyệt.'; return; }
+  for (const q of S.queue.filter(x => x.status === 'processing' && Date.now() - x.createdAt > 20000)) { q.status = 'wait'; await DB.put('queue', q); }
   applyTheme();
   const nRec = await runRecurring();
   el.file.addEventListener('change', () => onImportFile(el.file.files[0]));
