@@ -1,9 +1,9 @@
 // Service worker: ưu tiên mạng, mất mạng thì dùng bản đã lưu. Đổi VERSION mỗi lần sửa file để xoá cache cũ.
-const VERSION = 'so-chi-v6';
+const VERSION = 'so-chi-v7';
 const SHELL = [
   './', './index.html', './manifest.webmanifest', './css/app.css',
   './js/app.js', './js/db.js', './js/parse.js', './js/ai.js', './js/sync.js',
-  './icons/icon.svg', './icons/app-192.png', './icons/app-512.png', './icons/app-180.png',
+  './icons/icon.svg', './icons/app2-192.png', './icons/app2-512.png', './icons/app2-180.png',
 ];
 
 self.addEventListener('install', e => {
