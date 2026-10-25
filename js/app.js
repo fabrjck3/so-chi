@@ -572,6 +572,9 @@ function renderSettings() {
   <div class="sec"><span>Sao lưu</span></div>
   <div class="group">${act('Xuất JSON', 'export-json')}${act('Xuất CSV', 'export-csv')}${act('Nhập dữ liệu để khôi phục', 'import')}</div>
   <div class="foot">Dữ liệu nằm trên máy này. Sao lưu lần cuối: ${last}. Chọn "Lưu vào Tệp" để cất vào iCloud Drive.</div>
+  <div class="sec"><span>Thông tin màn hình</span></div>
+  <div class="group">${screenInfo().map(([k, v]) => `<div class="srow"><span>${k}</span><span>${v}</span></div>`).join('')}</div>
+  <div class="foot">Dùng để chẩn đoán khung app trên iPhone. Chụp màn hình mục này gửi cho người hỗ trợ nếu còn dải trống ở đáy.</div>
   <div class="sec"><span>Dữ liệu</span></div>
   <div class="group">${act('Tạo dữ liệu mẫu', 'sample')}${act('Xoá dữ liệu mẫu', 'unsample')}${act('Xoá toàn bộ giao dịch', 'wipe', 'bad', '')}</div>
   <div class="foot">${S.tx.length} giao dịch · ${S.queue.length} câu chờ</div>`;
@@ -1089,29 +1092,21 @@ document.addEventListener('change', async e => {
   }
 });
 
-/* ---------- khung app phủ kín màn hình (iPhone chạy từ Màn hình chính hay bị thiếu một dải ở đáy) ---------- */
-function fitApp() {
-  const app = $('#app'), dbg = new URLSearchParams(location.search).has('debug');
+/* ---------- đo kích thước màn hình (để chẩn đoán dải trống ở đáy trên iPhone) ---------- */
+function screenInfo() {
+  const mk = css => { const d = document.createElement('div'); d.style.cssText = 'position:fixed;left:0;top:0;width:1px;visibility:hidden;pointer-events:none;' + css; document.body.append(d); const r = d.getBoundingClientRect(); d.remove(); return r; };
   const standalone = window.navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches;
-  const fit = () => {
-    let h = Math.max(window.innerHeight, document.documentElement.clientHeight);
-    const sh = Math.max(screen.height, screen.width) === screen.height ? screen.height : screen.width;
-    // chạy từ Màn hình chính, dọc: nếu khung thấp hơn màn hình một chút thì kéo lên bằng chiều cao màn hình
-    if (standalone && window.innerHeight < window.innerWidth * 1.2 === false && sh - h > 0 && sh - h < 140) h = sh;
-    app.style.height = h + 'px'; app.style.bottom = 'auto';
-    if (dbg) {
-      let d = $('#dbg'); if (!d) { d = document.createElement('div'); d.id = 'dbg'; d.style.cssText = 'position:fixed;left:8px;top:60px;z-index:99;background:#000c;color:#0f0;font:11px monospace;padding:6px;border-radius:6px;white-space:pre'; document.body.append(d); }
-      d.textContent = `inner ${innerWidth}x${innerHeight}
-screen ${screen.width}x${screen.height}
-client ${document.documentElement.clientHeight}
-standalone ${standalone}
-app ${app.offsetHeight}`;
-    }
-  };
-  fit();
-  ['resize', 'orientationchange', 'pageshow'].forEach(e => window.addEventListener(e, fit));
-  document.addEventListener('visibilitychange', fit);
-  setTimeout(fit, 120); setTimeout(fit, 600);
+  const px = css => Math.round(mk(css).height);
+  const inset = side => { const d = document.createElement('div'); d.style.cssText = `position:fixed;visibility:hidden;padding-${side}:env(safe-area-inset-${side},0px)`; document.body.append(d); const v = parseFloat(getComputedStyle(d)['padding' + side[0].toUpperCase() + side.slice(1)]) || 0; d.remove(); return Math.round(v); };
+  const probeBottom = Math.round(mk('height:1px;top:auto;bottom:0').bottom);
+  const vv = window.visualViewport;
+  return [
+    ['Chạy từ Màn hình chính', standalone ? 'có' : 'không'],
+    ['innerHeight', innerHeight], ['visualViewport', vv ? Math.round(vv.height) : '-'],
+    ['screen cao', screen.height], ['100vh', px('height:100vh')], ['100dvh', px('height:100dvh')], ['100lvh', px('height:100lvh')], ['100svh', px('height:100svh')],
+    ['Đáy khung (fixed bottom:0)', probeBottom], ['Khung app cao', Math.round($('#app').getBoundingClientRect().height)],
+    ['Lề an toàn trên', inset('top')], ['Lề an toàn dưới', inset('bottom')],
+  ];
 }
 
 /* ---------- khởi động ---------- */
@@ -1133,7 +1128,6 @@ async function init() {
   // ?demo=1 tạo dữ liệu mẫu nếu máy còn trống; ?tab=stats|wallet|settings mở thẳng tab đó
   const qs = new URLSearchParams(location.search);
   if (qs.get('demo') === 'reset') await makeSample(true); else if (qs.has('demo') && !S.tx.length) await makeSample();
-  fitApp();
   renderAll();
   if (TITLES[qs.get('tab')]) setTab(qs.get('tab'));
   if (nRec) toast(`Đã ghi ${nRec} khoản định kỳ đến hạn`);
