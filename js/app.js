@@ -587,11 +587,11 @@ function renderAllExceptSettings() { S.dirty = new Set(['home', 'log', 'stats', 
 function openSheet(html, mount, cls = '') {
   S.chat = cls === 'chat';
   el.sheet.innerHTML = '<div class="grab"></div>' + html;
-  el.sheet.className = 'sheet on' + (cls ? ' ' + cls : ''); el.scrim.classList.add('on'); el.sheet.scrollTop = 0; $('#app').classList.add('sheetopen');
+  el.sheet.className = 'sheet on' + (cls ? ' ' + cls : ''); el.scrim.classList.add('on'); el.sheet.scrollTop = 0; $('#app').classList.add('sheetopen'); $('main').inert = true; $('.dock').inert = true;
   mount?.(el.sheet);
 }
 function closeSheet() {
-  el.sheet.classList.remove('on'); el.scrim.classList.remove('on'); S.C = null; S.chat = false; $('#app').classList.remove('sheetopen');
+  el.sheet.classList.remove('on'); el.scrim.classList.remove('on'); S.C = null; S.chat = false; $('#app').classList.remove('sheetopen'); $('main').inert = false; $('.dock').inert = false;
   if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur();
 }
 let toastT;
@@ -676,7 +676,7 @@ function openEntry() {
   openSheet(`<div class="chat-h"><h2>Nhập chi tiêu</h2><div class="chat-tools"><button class="link" data-act="kp">Bàn phím số</button><button class="link" data-act="manual">Nhập tay</button></div></div>
     <div class="chat-log" id="chatlog">${chatLogHTML()}</div>
     <div class="chat-in"><button class="clip" data-act="paste" aria-label="Dán tin nhắn ngân hàng"><svg viewBox="0 0 24 24"><path d="M9 4h6v3H9zM7 6H6a1 1 0 0 0-1 1v13a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V7a1 1 0 0 0-1-1h-1"/></svg></button>
-      <textarea class="inp" id="q" rows="1" placeholder="Gõ một câu, ví dụ 45k phở" aria-label="Câu nhập"></textarea>
+      <textarea class="inp" id="q" rows="1" enterkeyhint="send" autocomplete="off" placeholder="Gõ một câu, ví dụ 45k phở" aria-label="Câu nhập"></textarea>
       <button class="send" data-act="send" aria-label="Gửi"><svg viewBox="0 0 24 24"><path d="M12 19V5M6 11l6-6 6 6"/></svg></button></div>`, sh => {
     const log = $('#chatlog', sh); log.scrollTop = log.scrollHeight;
     const q = $('#q', sh); q.focus({ preventScroll: true });
