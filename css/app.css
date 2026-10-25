@@ -803,3 +803,10 @@ html:root .srow input[data-cat="name"]{flex:1;min-width:0;text-align:left!import
 .bx-bar.lv-near{--ac:var(--bb-amber)}.bx-bar.lv-over{--ac:var(--bb-coral)}
 .bx-col.now .b{box-shadow:none}
 .bx-dot{box-shadow:none}
+
+/* ===== Khoá trang, chỉ cuộn bên trong từng màn: hết khoảng trống đáy và không kéo cả trang trên iPhone ===== */
+html{background:var(--bg);height:100%;overflow:hidden;overscroll-behavior:none}
+body{position:fixed;inset:0;width:100%;height:100%;overflow:hidden;overscroll-behavior:none;background:var(--bg)}
+html:root #app{position:fixed;inset:0;height:auto;max-width:520px;margin-inline:auto}
+.view{overscroll-behavior-y:contain;-webkit-overflow-scrolling:touch}
+.sheet{overscroll-behavior:contain}
