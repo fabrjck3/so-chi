@@ -814,3 +814,8 @@ html:root #app{position:fixed;inset:0;height:auto;max-width:520px;margin-inline:
 /* nền html trùng màu đáy của app để dải thừa (nếu còn) không lộ ra */
 html{background:var(--bb-bg2,var(--bg))}
 body{background:var(--bb-bg2,var(--bg))}
+
+/* iOS 26: giữ thanh trạng thái trong suốt, làm trang cao bằng màn hình để WebKit giao đủ khung nhìn (hết dải trống ở đáy) */
+@media (display-mode: standalone){
+  html{min-height:min(100lvh,calc(100% + env(safe-area-inset-top)))}
+}
