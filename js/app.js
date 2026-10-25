@@ -43,7 +43,7 @@ const ICON_BY_NAME = { 'an uong': 'food', 'ca phe': 'cafe', 'di lai': 'move', 'h
 const badge = (name, color, force) => `<span class="ic" style="background:${color}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[force || ICON_BY_NAME[norm(name || '')] || 'other']}</svg></span>`;
 const DEF_SET = {
   budget: 6000000, dailyBudget: 0, recurring: [], sync: { url: '', token: '' }, bankBal: null, lastBal: null, seen: [], lastSync: null, categories: DEF_CATS, open: { bank: 0, cash: 0 }, apiKey: '', model: 'claude-haiku-5-5',
-  ai: true, autosave: true, defWallet: 'cash', theme: 'auto', lastBackup: null, learned: {}, welcomed: false,
+  ai: true, autosave: true, altInput: false, defWallet: 'cash', theme: 'auto', lastBackup: null, learned: {}, welcomed: false,
 };
 
 const S = { lm: 'day', ld: ymd(new Date()), lmk: mkey(new Date()), lcat: '', q: '', tx: [], set: null, queue: [], tab: 'home', month: mkey(new Date()), wf: 'all', busy: false, C: null, pill: {} };
@@ -563,7 +563,7 @@ function renderSettings() {
   <div class="sec"><span>Danh mục</span></div>
   <div class="group">${s.categories.map((c, i) => `<div class="srow"><input type="color" class="swatch" data-cat="color" data-i="${i}" value="${c.color}" aria-label="Màu ${esc(c.name)}"><input class="grow" data-cat="name" data-i="${i}" value="${esc(c.name)}" aria-label="Tên danh mục" style="text-align:left"><input class="bud" inputmode="numeric" data-cat="budget" data-i="${i}" placeholder="Ngân sách" value="${fmtNum(c.budget)}" aria-label="Ngân sách ${esc(c.name)}"><button class="x" data-act="catdel" data-i="${i}" aria-label="Xoá danh mục">×</button></div>`).join('')}${act('Thêm danh mục', 'catadd', '', '+')}</div>
   <div class="sec"><span>Nhập bằng lời</span></div>
-  <div class="group">${row('API key', `<input id="s-key" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" data-set="apiKey" value="${esc(s.apiKey)}" placeholder="sk-ant-...">`)}${row('Model', `<input id="s-model" data-set="model" value="${esc(s.model)}" autocapitalize="off" spellcheck="false">`)}${row('Dùng API khi cần', `<input type="checkbox" id="s-ai" data-set="ai" ${s.ai ? 'checked' : ''}>`)}${row('Tự lưu khi chắc chắn', `<input type="checkbox" id="s-auto" data-set="autosave" ${s.autosave !== false ? 'checked' : ''}>`)}${act('Kiểm tra kết nối', 'testkey')}</div>
+  <div class="group">${row('API key', `<input id="s-key" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" data-set="apiKey" value="${esc(s.apiKey)}" placeholder="sk-ant-...">`)}${row('Model', `<input id="s-model" data-set="model" value="${esc(s.model)}" autocapitalize="off" spellcheck="false">`)}${row('Dùng API khi cần', `<input type="checkbox" id="s-ai" data-set="ai" ${s.ai ? 'checked' : ''}>`)}${row('Ô nhập thử nghiệm', `<input type="checkbox" id="s-alt" data-set="altInput" ${s.altInput ? 'checked' : ''}>`)}${row('Tự lưu khi chắc chắn', `<input type="checkbox" id="s-auto" data-set="autosave" ${s.autosave !== false ? 'checked' : ''}>`)}${act('Kiểm tra kết nối', 'testkey')}</div>
   <div class="foot" id="keymsg">Câu đơn giản app tự hiểu trên máy. Câu phức tạp mới gửi lên Anthropic, chỉ gồm câu bạn gõ, ngày hôm nay và tên danh mục. Key chỉ lưu trên máy này, không nằm trong bản sao lưu.</div>
   <div class="sec"><span>Tin nhắn ngân hàng</span></div>
   <div class="group">${row('Địa chỉ Worker', `<input id="s-wurl" data-set="sync.url" inputmode="url" autocapitalize="off" spellcheck="false" placeholder="https://..." value="${esc(s.sync?.url || '')}">`)}${row('Mã đồng bộ', `<input id="s-wtok" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" data-set="sync.token" value="${esc(s.sync?.token || '')}">`)}${act('Đồng bộ ngay', 'syncnow')}</div>
@@ -676,19 +676,21 @@ function openEntry() {
   openSheet(`<div class="chat-h"><h2>Nhập chi tiêu</h2><div class="chat-tools"><button class="link" data-act="kp">Bàn phím số</button><button class="link" data-act="manual">Nhập tay</button></div></div>
     <div class="chat-log" id="chatlog">${chatLogHTML()}</div>
     <div class="chat-in"><button class="clip" data-act="paste" aria-label="Dán tin nhắn ngân hàng"><svg viewBox="0 0 24 24"><path d="M9 4h6v3H9zM7 6H6a1 1 0 0 0-1 1v13a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V7a1 1 0 0 0-1-1h-1"/></svg></button>
-      <textarea class="inp" id="q" rows="1" enterkeyhint="send" autocomplete="off" placeholder="Gõ một câu, ví dụ 45k phở" aria-label="Câu nhập"></textarea>
+      ${S.set.altInput ? '<div class="inp ce" id="q" contenteditable="plaintext-only" role="textbox" enterkeyhint="send" autocapitalize="sentences" data-ph="Gõ một câu, ví dụ 45k phở" aria-label="Câu nhập"></div>' : '<textarea class="inp" id="q" rows="1" enterkeyhint="send" autocomplete="off" placeholder="Gõ một câu, ví dụ 45k phở" aria-label="Câu nhập"></textarea>'}
       <button class="send" data-act="send" aria-label="Gửi"><svg viewBox="0 0 24 24"><path d="M12 19V5M6 11l6-6 6 6"/></svg></button></div>`, sh => {
     const log = $('#chatlog', sh); log.scrollTop = log.scrollHeight;
     const q = $('#q', sh); q.focus({ preventScroll: true });
     q.addEventListener('focus', () => setTimeout(() => { const l = $('#chatlog'); if (l) l.scrollTop = l.scrollHeight; }, 320));
-    q.addEventListener('input', () => { q.style.height = 'auto'; q.style.height = Math.min(110, q.scrollHeight) + 'px'; });
+    q.addEventListener('input', () => { if (q.isContentEditable) { if (!q.textContent) q.innerHTML = ''; return; } q.style.height = 'auto'; q.style.height = Math.min(110, q.scrollHeight) + 'px'; });
+    sh.addEventListener('mousedown', e => { if (e.target.closest('.chat-log button, .chat-in button')) e.preventDefault(); });
     q.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendFromInput(); } });
   }, 'chat');
 }
 function sendFromInput() {
   const q = $('#q'); if (!q) return;
-  const text = q.value.trim(); if (!text) return;
-  q.value = ''; q.style.height = 'auto'; q.focus();
+  const text = (q.isContentEditable ? q.textContent : q.value).trim(); if (!text) return;
+  if (q.isContentEditable) q.innerHTML = ''; else { q.value = ''; q.style.height = 'auto'; }
+  q.focus({ preventScroll: true });
   sendMessage(text);
 }
 async function sendMessage(text) {
@@ -1127,7 +1129,7 @@ const ACT = {
 
 document.addEventListener('click', e => {
   const b = e.target.closest('[data-act]'); if (!b) return;
-  const f = ACT[b.dataset.act]; if (f) { e.preventDefault(); f(b, e); }
+  const f = ACT[b.dataset.act]; if (f) { e.preventDefault(); if (S.chat && b.closest('.chat-log, .chat-in') && !['qopen', 'edit', 'manual', 'kp'].includes(b.dataset.act)) $('#q')?.focus({ preventScroll: true }); f(b, e); }
 });
 document.addEventListener('input', e => {
   const t = e.target;
