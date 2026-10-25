@@ -79,12 +79,13 @@ export async function callAPI({ apiKey, model, system, user, maxTokens = 700 }) 
     throw new AIError(detail || `Lỗi ${res.status}`, 'http');
   }
   const json = await res.json();
-  return (json.content || []).filter(b => b.type === 'text').map(b => b.text).join('');
+  const u = json.usage || {};
+  return { text: (json.content || []).filter(b => b.type === 'text').map(b => b.text).join(''), usage: { in: u.input_tokens || 0, out: u.output_tokens || 0 } };
 }
 
 export async function parseWithAI(text, { apiKey, model, categories, today }) {
-  const out = await callAPI({ apiKey, model, system: systemPrompt(today, categories), user: text });
-  return clean(extractJSON(out), categories, today);
+  const r = await callAPI({ apiKey, model, system: systemPrompt(today, categories), user: text });
+  return { items: clean(extractJSON(r.text), categories, today), usage: r.usage };
 }
 
 export async function testKey({ apiKey, model }) {

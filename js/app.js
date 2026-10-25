@@ -43,7 +43,7 @@ const ICON_BY_NAME = { 'an uong': 'food', 'ca phe': 'cafe', 'di lai': 'move', 'h
 const badge = (name, color, force) => `<span class="ic" style="background:${color}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[force || ICON_BY_NAME[norm(name || '')] || 'other']}</svg></span>`;
 const DEF_SET = {
   budget: 6000000, dailyBudget: 0, recurring: [], sync: { url: '', token: '' }, bankBal: null, lastBal: null, seen: [], lastSync: null, categories: DEF_CATS, open: { bank: 0, cash: 0 }, apiKey: '', model: 'claude-haiku-5-5',
-  ai: true, autosave: true, altInput: false, defWallet: 'cash', theme: 'auto', lastBackup: null, learned: {}, welcomed: false,
+  ai: true, autosave: true, altInput: false, usdVnd: 25500, price: { in: 0, out: 0 }, usage: {}, defWallet: 'cash', theme: 'auto', lastBackup: null, learned: {}, welcomed: false,
 };
 
 const S = { lm: 'day', ld: ymd(new Date()), lmk: mkey(new Date()), lcat: '', q: '', tx: [], set: null, queue: [], tab: 'home', month: mkey(new Date()), wf: 'all', busy: false, C: null, pill: {} };
@@ -563,8 +563,12 @@ function renderSettings() {
   <div class="sec"><span>Danh mục</span></div>
   <div class="group">${s.categories.map((c, i) => `<div class="srow"><input type="color" class="swatch" data-cat="color" data-i="${i}" value="${c.color}" aria-label="Màu ${esc(c.name)}"><input class="grow" data-cat="name" data-i="${i}" value="${esc(c.name)}" aria-label="Tên danh mục" style="text-align:left"><input class="bud" inputmode="numeric" data-cat="budget" data-i="${i}" placeholder="Ngân sách" value="${fmtNum(c.budget)}" aria-label="Ngân sách ${esc(c.name)}"><button class="x" data-act="catdel" data-i="${i}" aria-label="Xoá danh mục">×</button></div>`).join('')}${act('Thêm danh mục', 'catadd', '', '+')}</div>
   <div class="sec"><span>Nhập bằng lời</span></div>
-  <div class="group">${row('API key', `<input id="s-key" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" data-set="apiKey" value="${esc(s.apiKey)}" placeholder="sk-ant-...">`)}${row('Model', `<input id="s-model" data-set="model" value="${esc(s.model)}" autocapitalize="off" spellcheck="false">`)}${row('Dùng API khi cần', `<input type="checkbox" id="s-ai" data-set="ai" ${s.ai ? 'checked' : ''}>`)}${row('Ô nhập thử nghiệm', `<input type="checkbox" id="s-alt" data-set="altInput" ${s.altInput ? 'checked' : ''}>`)}${row('Tự lưu khi chắc chắn', `<input type="checkbox" id="s-auto" data-set="autosave" ${s.autosave !== false ? 'checked' : ''}>`)}${act('Kiểm tra kết nối', 'testkey')}</div>
+  <div class="group">${row('API key', `<input id="s-key" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" data-set="apiKey" value="${esc(s.apiKey)}" placeholder="sk-ant-...">`)}${row('Model', `<input id="s-model" data-set="model" value="${esc(s.model)}" autocapitalize="off" spellcheck="false">`)}${row('Dùng API khi cần', `<input type="checkbox" id="s-ai" data-set="ai" ${s.ai ? 'checked' : ''}>`)}${row('Tự lưu khi chắc chắn', `<input type="checkbox" id="s-auto" data-set="autosave" ${s.autosave !== false ? 'checked' : ''}>`)}${act('Kiểm tra kết nối', 'testkey')}</div>
   <div class="foot" id="keymsg">Câu đơn giản app tự hiểu trên máy. Câu phức tạp mới gửi lên Anthropic, chỉ gồm câu bạn gõ, ngày hôm nay và tên danh mục. Key chỉ lưu trên máy này, không nằm trong bản sao lưu.</div>
+  <div class="sec"><span>Chi phí gọi model</span></div>
+  <div class="group">${(() => { const u = s.usage?.[mkey(new Date())] || { calls: 0, in: 0, out: 0, usd: 0 }, p = priceOf();
+    return row('Tháng này', `<span>${u.calls} lần · ${u.in + u.out} token · ≈ ${fmtVnd(u.usd * (s.usdVnd || 25500))}</span>`) + row('Bảng giá đang dùng', `<span>${p ? '$' + p[0] + ' vào · $' + p[1] + ' ra / 1 triệu token' : 'chưa có giá cho model này'}</span>`); })()}${row('Tỷ giá (₫ mỗi USD)', `<input id="s-fx" inputmode="numeric" data-set="usdVnd" value="${fmtNum(s.usdVnd)}">`)}${row('Giá vào tuỳ chỉnh ($/1 triệu)', `<input id="s-pin" inputmode="decimal" data-set="price.in" placeholder="tự động" value="${s.price?.in || ''}">`)}${row('Giá ra tuỳ chỉnh ($/1 triệu)', `<input id="s-pout" inputmode="decimal" data-set="price.out" placeholder="tự động" value="${s.price?.out || ''}">`)}</div>
+  <div class="foot">Giá mặc định theo bảng giá công khai của model; chỉ gọi model khi câu nhập phức tạp, câu đơn giản và tin ngân hàng hiểu trên máy nên miễn phí. Tỷ giá và giá chỉ để ước tính, đối chiếu hoá đơn thật ở trang Anthropic Console.</div>
   <div class="sec"><span>Tin nhắn ngân hàng</span></div>
   <div class="group">${row('Địa chỉ Worker', `<input id="s-wurl" data-set="sync.url" inputmode="url" autocapitalize="off" spellcheck="false" placeholder="https://..." value="${esc(s.sync?.url || '')}">`)}${row('Mã đồng bộ', `<input id="s-wtok" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" data-set="sync.token" value="${esc(s.sync?.token || '')}">`)}${act('Đồng bộ ngay', 'syncnow')}</div>
   <div class="foot">Phím tắt trên iPhone trích sẵn ngày, số biến động và số dư rồi gửi lên Worker của riêng bạn. Nội dung giao dịch và số tài khoản không được gửi. ${s.lastSync ? 'Đồng bộ lần cuối: ' + new Date(s.lastSync).toLocaleString('vi-VN') : 'Chưa đồng bộ lần nào.'}</div>
@@ -631,6 +635,20 @@ async function kpSave() {
   await load(); closeSheet(); renderAll(); toast('Đã lưu ' + fmt(amount));
 }
 
+/* chi phí gọi model: token và tiền */
+const PRICES = { 'claude-haiku-5-5': [0.10, 0.50], 'claude-haiku-4-5': [1, 5], 'claude-sonnet-5-5': [2, 10], 'claude-sonnet-5': [2, 10], 'claude-opus-5-5': [4, 20], 'claude-opus-5': [5, 25] };
+function priceOf() {
+  const cu = S.set.price || {};
+  if (cu.in > 0 && cu.out > 0) return [cu.in, cu.out];
+  return PRICES[S.set.model] || null;
+}
+function costOf(u) {
+  const p = priceOf(); if (!p || !u) return null;
+  const usd = (u.in * p[0] + u.out * p[1]) / 1e6;
+  return { usd, vnd: usd * (S.set.usdVnd || 25500) };
+}
+const fmtVnd = n => (n < 10 ? n.toLocaleString('vi-VN', { maximumFractionDigits: 1 }) : Math.round(n).toLocaleString('vi-VN')) + 'đ';
+
 /* nhập bằng lời: gửi tin nhắn, xử lý ở nền, xem lại như đoạn chat */
 const AUTO_OK = 0.8;
 const hhmm = t => new Date(t).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
@@ -640,37 +658,68 @@ const cbLine = (it, id) => {
   const inner = `<span>${mid}<br><em>${dlabel(it.date)}</em></span><b class="${it.type === 'thu' ? 'in' : ''}">${sgnAmt(it)}</b>`;
   return id ? `<button class="cb-line" data-act="edit" data-id="${id}">${inner}</button>` : `<div class="cb-line">${inner}</div>`;
 };
+function costLine(q) {
+  if (q.how === 'ai' && q.usage) {
+    const c = costOf(q.usage);
+    return `<div class="cb-cost">Model · ${q.usage.in} vào + ${q.usage.out} ra token${c ? ` · ≈ ${fmtVnd(c.vnd)}` : ' · chưa có bảng giá'}</div>`;
+  }
+  if (q.how === 'local' || q.how === 'sms') return `<div class="cb-cost">Hiểu trên máy · 0đ</div>`;
+  return '';
+}
 function chatBubble(q) {
-  const me = `<div class="cb-me">${q.kind === 'sms' ? esc(q.text) : esc(q.text)}<span class="cb-time">${hhmm(q.createdAt)}</span></div>`;
+  const me = `<div class="cb-me">${esc(q.text)}<span class="cb-time">${hhmm(q.createdAt)}</span></div>`;
   const items = q.items || [];
+  const cost = costLine(q);
   let ai = '';
   if (q.status === 'processing') ai = `<div class="cb-ai"><span class="spin"></span>Đang xử lý...</div>`;
   else if (q.status === 'wait') ai = `<div class="cb-ai">Chờ có mạng để xử lý.<div class="cb-acts"><button data-act="qretry" data-id="${q.id}">Thử lại</button><button data-act="qdel" data-id="${q.id}">Xoá</button></div></div>`;
   else if (q.status === 'error') ai = `<div class="cb-ai"><span class="bad">${esc(q.error || 'Không hiểu được câu này.')}</span><div class="cb-acts"><button data-act="qretry" data-id="${q.id}">Thử lại</button><button data-act="manual">Nhập tay</button><button data-act="qdel" data-id="${q.id}">Xoá</button></div></div>`;
-  else if (q.status === 'ready') ai = `<div class="cb-ai warn"><b>Cần bạn xác nhận</b>${items.map(it => cbLine(it)).join('')}${items.find(it => it.ambiguity) ? `<div class="cb-hint">${esc(items.find(it => it.ambiguity).ambiguity)}</div>` : ''}<div class="cb-acts"><button class="pri" data-act="qopen" data-id="${q.id}">Xác nhận</button><button data-act="qdel" data-id="${q.id}">Bỏ</button></div></div>`;
+  else if (q.status === 'ready') ai = `<div class="cb-ai warn"><b>Cần bạn xác nhận</b>${items.map(it => cbLine(it)).join('')}${items.find(it => it.ambiguity) ? `<div class="cb-hint">${esc(items.find(it => it.ambiguity).ambiguity)}</div>` : ''}${cost}<div class="cb-acts"><button class="pri" data-act="qopen" data-id="${q.id}">Xác nhận</button><button data-act="qdel" data-id="${q.id}">Bỏ</button></div></div>`;
   else if (q.status === 'saved') {
     const txs = (q.txIds || []).map(id => S.tx.find(t => t.id === id)).filter(Boolean);
     ai = txs.length
-      ? `<div class="cb-ai ok"><b>Đã lưu</b>${txs.map(t => cbLine(t, t.id)).join('')}<div class="cb-acts"><button data-act="qundo" data-id="${q.id}">Hoàn tác</button></div></div>`
+      ? `<div class="cb-ai ok"><b>Đã lưu</b>${txs.map(t => cbLine(t, t.id)).join('')}${cost}<div class="cb-acts"><button data-act="qundo" data-id="${q.id}">Hoàn tác</button></div></div>`
       : `<div class="cb-ai"><span class="sm">Đã lưu, nhưng khoản này sau đó đã bị xoá.</span></div>`;
   } else if (q.status === 'undone') ai = `<div class="cb-ai"><span class="sm">Đã hoàn tác.</span><div class="cb-acts"><button data-act="qopen" data-id="${q.id}">Xác nhận lại</button></div></div>`;
   return me + ai;
 }
+const sigOf = q => [q.status, q.text, (q.txIds || []).map(id => S.tx.some(t => t.id === id) ? 1 : 0).join(''), q.how || '', q.usage?.in || '', q.error || '', (q.items || []).length].join('|');
+const chatList = () => [...S.queue].sort((a, b) => a.createdAt - b.createdAt).slice(-40);
+const EMPTY_CHAT = `<div class="cb-empty">Gõ một câu như "45k phở" hay "hôm qua grab 62k bằng thẻ". App tự hiểu và lưu ở nền, bạn không cần chờ. Mọi câu đã gửi nằm lại ở đây để xem lại.</div>`;
 function chatLogHTML() {
-  const list = [...S.queue].sort((a, b) => a.createdAt - b.createdAt).slice(-40);
-  if (!list.length) return `<div class="cb-empty">Gõ một câu như "45k phở" hay "hôm qua grab 62k bằng thẻ". App tự hiểu và lưu ở nền, bạn không cần chờ. Mọi câu đã gửi nằm lại ở đây để xem lại.</div>`;
+  const list = chatList();
+  if (!list.length) return EMPTY_CHAT;
   let last = '';
   return list.map(q => {
     const d = ymd(new Date(q.createdAt)), sep = d !== last ? `<div class="cb-day">${dlabel(d)}</div>` : ''; last = d;
-    return sep + chatBubble(q);
+    return sep + `<div class="cb-g" data-id="${q.id}" data-sig="${esc(sigOf(q))}">${chatBubble(q)}</div>`;
   }).join('');
 }
 function refreshChat() {
   if (!S.chat || !el.sheet.classList.contains('on')) return;
   const log = $('#chatlog'); if (!log) return;
-  const stick = log.scrollHeight - log.scrollTop - log.clientHeight < 80;
-  log.innerHTML = chatLogHTML();
-  if (stick) log.scrollTop = log.scrollHeight;
+  const stick = log.scrollHeight - log.scrollTop - log.clientHeight < 140;
+  const list = chatList(), ids = new Set(list.map(q => q.id));
+  log.querySelectorAll('.cb-g').forEach(g => { if (!ids.has(g.dataset.id)) g.remove(); });
+  if (!list.length) { log.innerHTML = EMPTY_CHAT; return; }
+  log.querySelector('.cb-empty')?.remove();
+  let prev = null, lastDay = '';
+  list.forEach(q => {
+    const d = ymd(new Date(q.createdAt)), sig = sigOf(q);
+    let g = log.querySelector(`.cb-g[data-id="${q.id}"]`);
+    if (!g) {
+      g = document.createElement('div'); g.className = 'cb-g new'; g.dataset.id = q.id; g.dataset.sig = sig; g.dataset.t = Date.now(); g.innerHTML = chatBubble(q);
+      if (d !== lastDay) { const sep = document.createElement('div'); sep.className = 'cb-day'; sep.textContent = dlabel(d); prev ? prev.after(sep) : log.prepend(sep); prev = sep; }
+      prev ? prev.after(g) : log.prepend(g);
+    } else if (g.dataset.sig !== sig) {
+      g.dataset.sig = sig;
+      const tmp = document.createElement('div'); tmp.innerHTML = chatBubble(q);
+      const ai = tmp.querySelector('.cb-ai'), old = g.querySelector('.cb-ai');
+      if (ai) { if (Date.now() - Number(g.dataset.t || 0) > 700) ai.classList.add('chg-ai'); old ? old.replaceWith(ai) : g.append(ai); } else old?.remove();
+    }
+    prev = g; lastDay = d;
+  });
+  if (stick) requestAnimationFrame(() => log.scrollTo({ top: log.scrollHeight, behavior: 'smooth' }));
 }
 function openEntry() {
   openSheet(`<div class="chat-h"><h2>Nhập chi tiêu</h2><div class="chat-tools"><button class="link" data-act="kp">Bàn phím số</button><button class="link" data-act="manual">Nhập tay</button></div></div>
@@ -690,7 +739,7 @@ function sendFromInput() {
   const q = $('#q'); if (!q) return;
   const text = (q.isContentEditable ? q.textContent : q.value).trim(); if (!text) return;
   if (q.isContentEditable) q.innerHTML = ''; else { q.value = ''; q.style.height = 'auto'; }
-  q.focus({ preventScroll: true });
+  q.blur(); // gửi xong tự cất bàn phím
   sendMessage(text);
 }
 async function sendMessage(text) {
@@ -716,6 +765,12 @@ async function commitItems(items) {
   await DB.putMany('tx', rows); await saveSet();
   return rows;
 }
+async function logUsage(u) {
+  const mk = mkey(new Date()), c = costOf(u) || { usd: 0 };
+  const m = (S.set.usage[mk] ||= { calls: 0, in: 0, out: 0, usd: 0 });
+  m.calls++; m.in += u.in; m.out += u.out; m.usd += c.usd;
+  await saveSet();
+}
 async function processEntry(q) {
   const today = pd(q.today);
   const ctx = { today, categories: S.set.categories, learned: S.set.learned, defWallet: S.set.defWallet };
@@ -723,15 +778,15 @@ async function processEntry(q) {
   let items = null;
   const sms = parseBankSMS(q.text, ctx);
   if (sms.items.length) {
-    items = sms.items;
+    items = sms.items; q.how = 'sms';
     items.forEach(it => {
       if (S.tx.some(t => t.date === it.date && t.amount === it.amount && t.type === it.type && t.wallet === 'bank' && !t.recur)) { it.confidence = 0.6; it.ambiguity = 'Có thể trùng với khoản đã ghi, kiểm tra trước khi lưu'; }
     });
   } else {
     const local = parseLocal(q.text, ctx);
-    if (local?.certain) items = local.items;
+    if (local?.certain) { items = local.items; q.how = 'local'; }
     else if (canAI && navigator.onLine) {
-      try { items = await parseWithAI(q.text, { apiKey: S.set.apiKey, model: S.set.model, categories: catNames(), today }); }
+      try { const r = await parseWithAI(q.text, { apiKey: S.set.apiKey, model: S.set.model, categories: catNames(), today }); items = r.items; q.usage = r.usage; q.how = 'ai'; await logUsage(r.usage); }
       catch (e) {
         if (local?.items.length) { items = local.items; items.forEach(it => { it.ambiguity = it.ambiguity || 'Không gọi được API, tạm hiểu trên máy'; it.confidence = Math.min(it.confidence, .6); }); }
         else if (e.kind === 'network') q.status = 'wait';
@@ -740,7 +795,7 @@ async function processEntry(q) {
     } else if (canAI) {
       if (local?.items.length) { items = local.items; items.forEach(it => { it.ambiguity = 'Đang mất mạng, tạm hiểu trên máy'; it.confidence = Math.min(it.confidence, .6); }); }
       else q.status = 'wait';
-    } else if (local?.items.length) items = local.items;
+    } else if (local?.items.length) { items = local.items; q.how = 'local'; }
     else { q.status = 'error'; q.error = 'Câu này cần API key để hiểu. Dán key ở Cài đặt, hoặc bấm "Nhập tay".'; }
   }
   if (items) {
@@ -1099,7 +1154,11 @@ const ACT = {
   adjust: () => openAdjust(),
   adjok: () => applyAdjust(),
   qopen: b => { const q = S.queue.find(x => x.id === b.dataset.id); if (q) openConfirm({ items: q.items, text: q.text, queueId: q.id }); },
-  qdel: async b => { await DB.del('queue', b.dataset.id); S.queue = S.queue.filter(q => q.id !== b.dataset.id); renderHome(); refreshChat(); },
+  qdel: async b => {
+    const id = b.dataset.id, g = S.chat ? document.querySelector(`.cb-g[data-id="${id}"]`) : null;
+    if (g) { g.style.setProperty('--h', g.offsetHeight + 'px'); g.classList.add('out'); await new Promise(r => setTimeout(r, 280)); }
+    await DB.del('queue', id); S.queue = S.queue.filter(q => q.id !== id); renderHome(); refreshChat();
+  },
   sample: () => makeSample(),
   welcomed: async () => { S.set.welcomed = true; await saveSet(); renderHome(); },
   unsample: async () => { const ids = S.tx.filter(t => t.sample).map(t => t.id); await DB.delMany('tx', ids); const qids = S.queue.filter(q => q.sample).map(q => q.id); if (qids.length) { await DB.delMany('queue', qids); S.queue = S.queue.filter(q => !q.sample); } S.set.recurring = S.set.recurring.filter(r => !r.sample); await saveSet(); await load(); renderAll(); toast(`Đã xoá ${ids.length} khoản mẫu`); },
@@ -1129,7 +1188,7 @@ const ACT = {
 
 document.addEventListener('click', e => {
   const b = e.target.closest('[data-act]'); if (!b) return;
-  const f = ACT[b.dataset.act]; if (f) { e.preventDefault(); if (S.chat && b.closest('.chat-log, .chat-in') && !['qopen', 'edit', 'manual', 'kp'].includes(b.dataset.act)) $('#q')?.focus({ preventScroll: true }); f(b, e); }
+  const f = ACT[b.dataset.act]; if (f) { e.preventDefault(); if (S.chat && b.closest('.chat-log, .chat-in') && document.activeElement?.id === 'q' && !['qopen', 'edit', 'manual', 'kp'].includes(b.dataset.act)) $('#q')?.focus({ preventScroll: true }); f(b, e); }
 });
 document.addEventListener('input', e => {
   const t = e.target;
@@ -1143,10 +1202,11 @@ document.addEventListener('change', async e => {
   if (t.dataset.r) { rField(t, true); return; }
   if (t.dataset.ld !== undefined) { if (t.value && t.value <= ymd(new Date())) { S.ld = t.value; renderLog(); } return; }
   if (t.dataset.set) {
-    const k = t.dataset.set, num = ['budget', 'dailyBudget', 'open.bank', 'open.cash'].includes(k);
+    const k = t.dataset.set, num = ['budget', 'dailyBudget', 'open.bank', 'open.cash', 'usdVnd'].includes(k);
     let v = t.type === 'checkbox' ? t.checked : t.value;
     if (num) { v = amountFromText(v) || 0; t.value = fmtNum(v); }
-    if (k.startsWith('sync.')) S.set.sync[k.slice(5)] = String(v).trim();
+    if (k.startsWith('price.')) S.set.price[k.slice(6)] = parseFloat(String(v).replace(',', '.')) || 0;
+    else if (k.startsWith('sync.')) S.set.sync[k.slice(5)] = String(v).trim();
     else if (k.startsWith('open.')) S.set.open[k.slice(5)] = v; else S.set[k] = typeof v === 'string' ? v.trim() : v;
     await saveSet();
     if (k === 'theme') applyTheme();
