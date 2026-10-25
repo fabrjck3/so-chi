@@ -578,8 +578,10 @@ function renderSettings() {
   <div class="foot">${S.tx.length} giao dịch · ${S.queue.length} câu chờ</div>`;
 }
 
-function renderAll() { renderHome(); renderLog(); renderStats(); renderWallet(); renderSettings(); updatePill(); }
-function renderAllExceptSettings() { renderHome(); renderLog(); renderStats(); renderWallet(); updatePill(); }
+const RENDER = { home: renderHome, log: renderLog, stats: renderStats, wallet: renderWallet, settings: renderSettings };
+function renderTab(t) { if (S.dirty?.has(t)) { S.dirty.delete(t); RENDER[t](); } }
+function renderAll() { S.dirty = new Set(Object.keys(RENDER)); renderTab(S.tab); updatePill(); }
+function renderAllExceptSettings() { S.dirty = new Set(['home', 'log', 'stats', 'wallet']); renderTab(S.tab); updatePill(); }
 
 /* ---------- sheet ---------- */
 function openSheet(html, mount, cls = '') {
@@ -678,6 +680,7 @@ function openEntry() {
       <button class="send" data-act="send" aria-label="Gửi"><svg viewBox="0 0 24 24"><path d="M12 19V5M6 11l6-6 6 6"/></svg></button></div>`, sh => {
     const log = $('#chatlog', sh); log.scrollTop = log.scrollHeight;
     const q = $('#q', sh); q.focus();
+    q.addEventListener('focus', () => setTimeout(() => { const l = $('#chatlog'); if (l) l.scrollTop = l.scrollHeight; }, 320));
     q.addEventListener('input', () => { q.style.height = 'auto'; q.style.height = Math.min(110, q.scrollHeight) + 'px'; });
     q.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendFromInput(); } });
   }, 'chat');
@@ -1015,7 +1018,7 @@ async function makeSample(reset) {
 /* ---------- giao diện: tab, pill, theme ---------- */
 const TITLES = { home: 'Hôm nay', log: 'Sổ chi', stats: 'Thống kê', wallet: 'Ví', settings: 'Cài đặt' };
 function setTab(t) {
-  S.tab = t;
+  S.tab = t; renderTab(t);
   Object.entries({ home: el.home, log: el.log, stats: el.stats, wallet: el.wallet, settings: el.settings }).forEach(([k, v]) => v.classList.toggle('on', k === t));
   document.querySelectorAll('.tab').forEach(b => b.setAttribute('aria-selected', String(b.dataset.tab === t)));
   updatePill();
@@ -1180,7 +1183,12 @@ async function init() {
   ['home', 'log', 'stats', 'wallet', 'settings'].forEach(k => el[k].addEventListener('scroll', updatePill, { passive: true }));
   if (window.visualViewport) {
     const vv = window.visualViewport, app = $('#app');
-    const upd = () => app.style.setProperty('--kb', Math.max(0, window.innerHeight - vv.height - vv.offsetTop) + 'px');
+    const upd = () => {
+      const kb = Math.max(0, window.innerHeight - vv.height - vv.offsetTop), open = window.innerHeight - vv.height > 120;
+      app.style.setProperty('--kb', kb + 'px'); app.style.setProperty('--vvh', Math.round(vv.height) + 'px');
+      app.classList.toggle('kbopen', open);
+      if (S.chat) requestAnimationFrame(() => { const l = $('#chatlog'); if (l) l.scrollTop = l.scrollHeight; });
+    };
     vv.addEventListener('resize', upd); vv.addEventListener('scroll', upd);
   }
   // ?demo=1 tạo dữ liệu mẫu nếu máy còn trống; ?tab=stats|wallet|settings mở thẳng tab đó

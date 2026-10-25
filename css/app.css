@@ -854,3 +854,23 @@ select.inp{min-width:0;width:100%}
 .chat-in .send{background:var(--accent);color:var(--accent-fg)}
 .chat-in .clip{background:var(--h0);color:var(--muted)}
 .chat-in svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+
+
+/* ===== Mượt hơn: bỏ làm mờ nền ở các khối trong màn cuộn (nặng trên iPhone), giữ ở thanh tab, tiêu đề, bảng ===== */
+.bx-glass,.card,.hero,.group,.bx-w,.bx-banner,.bx-card,.cb-ai,.ex{backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
+button,[data-act],input,textarea,select{touch-action:manipulation}
+.view{contain:layout style;-webkit-overflow-scrolling:touch}
+.sheet{will-change:transform}
+.bx-tile,.li,.btn,.tab,.plus,.cb-acts button,.cb-line{transition:transform .12s ease,background-color .12s ease,opacity .12s ease}
+.bx-tile:active,.btn:active,.cb-acts button:active{transform:scale(.97)}
+.li:active,.cb-line:active{opacity:.6}
+
+/* ===== sáng mờ ở góc mỗi khối (khôi phục, nhẹ hơn trước) ===== */
+.bx-glass::before{display:block!important;opacity:.5}
+
+/* ===== bàn phím mở: khung nhập khớp đúng vùng nhìn thấy, luôn thấy tin nhắn gần nhất ===== */
+#app.kbopen .sheet{bottom:calc(8px + var(--kb,0px));max-height:calc(var(--vvh,100%) - 20px)}
+#app.kbopen .sheet.chat{height:calc(var(--vvh,100%) - 20px)}
+#app.kbopen .dock{display:none}
+#app.kbopen .sheet.chat .chat-h h2{font-size:16px}
+#app.kbopen .sheet.chat .grab{margin-bottom:6px}
