@@ -572,9 +572,6 @@ function renderSettings() {
   <div class="sec"><span>Sao lưu</span></div>
   <div class="group">${act('Xuất JSON', 'export-json')}${act('Xuất CSV', 'export-csv')}${act('Nhập dữ liệu để khôi phục', 'import')}</div>
   <div class="foot">Dữ liệu nằm trên máy này. Sao lưu lần cuối: ${last}. Chọn "Lưu vào Tệp" để cất vào iCloud Drive.</div>
-  <div class="sec"><span>Thông tin màn hình</span></div>
-  <div class="group">${screenInfo().map(([k, v]) => `<div class="srow"><span>${k}</span><span>${v}</span></div>`).join('')}</div>
-  <div class="foot">Dùng để chẩn đoán khung app trên iPhone. Chụp màn hình mục này gửi cho người hỗ trợ nếu còn dải trống ở đáy.</div>
   <div class="sec"><span>Dữ liệu</span></div>
   <div class="group">${act('Tạo dữ liệu mẫu', 'sample')}${act('Xoá dữ liệu mẫu', 'unsample')}${act('Xoá toàn bộ giao dịch', 'wipe', 'bad', '')}</div>
   <div class="foot">${S.tx.length} giao dịch · ${S.queue.length} câu chờ</div>`;
@@ -965,7 +962,7 @@ function applyTheme() {
 /* ---------- sự kiện ---------- */
 const ACT = {
   tab: b => setTab(b.dataset.tab),
-  add: () => openKeypad(),
+  add: () => openEntry(),
   kp: () => openKeypad(),
   nl: () => openEntry(),
   kpkey: b => { const k = b.dataset.k; if (k === '⌫') KP.val = KP.val.slice(0, -1); else if (KP.val.length < 10 && !(KP.val === '' && k[0] === '0')) KP.val += k; kpShow(); },
@@ -1091,23 +1088,6 @@ document.addEventListener('change', async e => {
     await saveSet(); renderAllExceptSettings();
   }
 });
-
-/* ---------- đo kích thước màn hình (để chẩn đoán dải trống ở đáy trên iPhone) ---------- */
-function screenInfo() {
-  const mk = css => { const d = document.createElement('div'); d.style.cssText = 'position:fixed;left:0;top:0;width:1px;visibility:hidden;pointer-events:none;' + css; document.body.append(d); const r = d.getBoundingClientRect(); d.remove(); return r; };
-  const standalone = window.navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches;
-  const px = css => Math.round(mk(css).height);
-  const inset = side => { const d = document.createElement('div'); d.style.cssText = `position:fixed;visibility:hidden;padding-${side}:env(safe-area-inset-${side},0px)`; document.body.append(d); const v = parseFloat(getComputedStyle(d)['padding' + side[0].toUpperCase() + side.slice(1)]) || 0; d.remove(); return Math.round(v); };
-  const probeBottom = Math.round(mk('height:1px;top:auto;bottom:0').bottom);
-  const vv = window.visualViewport;
-  return [
-    ['Chạy từ Màn hình chính', standalone ? 'có' : 'không'],
-    ['innerHeight', innerHeight], ['visualViewport', vv ? Math.round(vv.height) : '-'],
-    ['screen cao', screen.height], ['100vh', px('height:100vh')], ['100dvh', px('height:100dvh')], ['100lvh', px('height:100lvh')], ['100svh', px('height:100svh')],
-    ['Đáy khung (fixed bottom:0)', probeBottom], ['Khung app cao', Math.round($('#app').getBoundingClientRect().height)],
-    ['Lề an toàn trên', inset('top')], ['Lề an toàn dưới', inset('bottom')],
-  ];
-}
 
 /* ---------- khởi động ---------- */
 async function init() {
