@@ -587,11 +587,11 @@ function renderAllExceptSettings() { S.dirty = new Set(['home', 'log', 'stats', 
 function openSheet(html, mount, cls = '') {
   S.chat = cls === 'chat';
   el.sheet.innerHTML = '<div class="grab"></div>' + html;
-  el.sheet.className = 'sheet on' + (cls ? ' ' + cls : ''); el.scrim.classList.add('on'); el.sheet.scrollTop = 0;
+  el.sheet.className = 'sheet on' + (cls ? ' ' + cls : ''); el.scrim.classList.add('on'); el.sheet.scrollTop = 0; $('#app').classList.add('sheetopen');
   mount?.(el.sheet);
 }
 function closeSheet() {
-  el.sheet.classList.remove('on'); el.scrim.classList.remove('on'); S.C = null; S.chat = false;
+  el.sheet.classList.remove('on'); el.scrim.classList.remove('on'); S.C = null; S.chat = false; $('#app').classList.remove('sheetopen');
   if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur();
 }
 let toastT;
@@ -679,7 +679,7 @@ function openEntry() {
       <textarea class="inp" id="q" rows="1" placeholder="Gõ một câu, ví dụ 45k phở" aria-label="Câu nhập"></textarea>
       <button class="send" data-act="send" aria-label="Gửi"><svg viewBox="0 0 24 24"><path d="M12 19V5M6 11l6-6 6 6"/></svg></button></div>`, sh => {
     const log = $('#chatlog', sh); log.scrollTop = log.scrollHeight;
-    const q = $('#q', sh); q.focus();
+    const q = $('#q', sh); q.focus({ preventScroll: true });
     q.addEventListener('focus', () => setTimeout(() => { const l = $('#chatlog'); if (l) l.scrollTop = l.scrollHeight; }, 320));
     q.addEventListener('input', () => { q.style.height = 'auto'; q.style.height = Math.min(110, q.scrollHeight) + 'px'; });
     q.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendFromInput(); } });
@@ -1185,7 +1185,7 @@ async function init() {
     const vv = window.visualViewport, app = $('#app');
     const upd = () => {
       const kb = Math.max(0, window.innerHeight - vv.height - vv.offsetTop), open = window.innerHeight - vv.height > 120;
-      app.style.setProperty('--kb', kb + 'px'); app.style.setProperty('--vvh', Math.round(vv.height) + 'px');
+      app.style.setProperty('--kb', kb + 'px'); app.style.setProperty('--vvh', Math.round(vv.height) + 'px'); app.style.setProperty('--vvt', Math.round(vv.offsetTop) + 'px');
       app.classList.toggle('kbopen', open);
       if (S.chat) requestAnimationFrame(() => { const l = $('#chatlog'); if (l) l.scrollTop = l.scrollHeight; });
     };

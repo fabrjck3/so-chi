@@ -874,3 +874,25 @@ button,[data-act],input,textarea,select{touch-action:manipulation}
 #app.kbopen .dock{display:none}
 #app.kbopen .sheet.chat .chat-h h2{font-size:16px}
 #app.kbopen .sheet.chat .grab{margin-bottom:6px}
+
+
+/* ===== Chuyển động khi bấm +: trượt lên mượt kiểu lò xo, mờ dần nền, nút + xoay thành dấu × ===== */
+.sheet{transform:translateY(104%) scale(.985);transform-origin:50% 100%;opacity:0;visibility:hidden;
+  transition:transform .28s cubic-bezier(.4,0,1,1),opacity .2s ease,visibility 0s linear .28s,bottom .25s ease-out,height .25s ease-out,max-height .25s ease-out}
+.sheet.on{transform:none;opacity:1;visibility:visible;
+  transition:transform .5s cubic-bezier(.22,1,.36,1),opacity .22s ease,visibility 0s,bottom .25s ease-out,height .25s ease-out,max-height .25s ease-out}
+.scrim{transition:opacity .32s ease}
+.plus{transition:transform .5s cubic-bezier(.34,1.56,.64,1),box-shadow .3s ease}
+#app.sheetopen .plus{transform:rotate(135deg) scale(.9)}
+.plus:active{transform:scale(.9)}
+@media (prefers-reduced-motion:reduce){.sheet,.sheet.on{transition:none}}
+
+
+/* ===== Khung chat khi bàn phím mở: đặt theo đúng vùng nhìn thấy (từ dưới thanh trạng thái đến sát bàn phím), tin nhắn dồn xuống dưới ===== */
+.chat-log>:first-child{margin-top:auto}
+#app.kbopen .sheet.chat{top:calc(var(--vvt,0px) + env(safe-area-inset-top,0px) + 6px);bottom:auto;max-height:none;height:calc(var(--vvh,600px) - env(safe-area-inset-top,0px) - 14px);transition:transform .5s cubic-bezier(.22,1,.36,1),opacity .22s ease,top .22s ease-out,height .22s ease-out}
+#app.kbopen .sheet:not(.chat){bottom:calc(8px + var(--kb,0px));max-height:calc(var(--vvh,600px) - env(safe-area-inset-top,0px) - 14px)}
+.sheet.chat .chat-in{padding-bottom:2px}
+#app.kbopen .cb-line em,#app.kbopen .cb-time{display:none}
+#app.kbopen .cb-me{padding:7px 12px;margin-top:3px}
+#app.kbopen .cb-ai{padding:8px 11px}
