@@ -1089,6 +1089,31 @@ document.addEventListener('change', async e => {
   }
 });
 
+/* ---------- khung app phủ kín màn hình (iPhone chạy từ Màn hình chính hay bị thiếu một dải ở đáy) ---------- */
+function fitApp() {
+  const app = $('#app'), dbg = new URLSearchParams(location.search).has('debug');
+  const standalone = window.navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches;
+  const fit = () => {
+    let h = Math.max(window.innerHeight, document.documentElement.clientHeight);
+    const sh = Math.max(screen.height, screen.width) === screen.height ? screen.height : screen.width;
+    // chạy từ Màn hình chính, dọc: nếu khung thấp hơn màn hình một chút thì kéo lên bằng chiều cao màn hình
+    if (standalone && window.innerHeight < window.innerWidth * 1.2 === false && sh - h > 0 && sh - h < 140) h = sh;
+    app.style.height = h + 'px'; app.style.bottom = 'auto';
+    if (dbg) {
+      let d = $('#dbg'); if (!d) { d = document.createElement('div'); d.id = 'dbg'; d.style.cssText = 'position:fixed;left:8px;top:60px;z-index:99;background:#000c;color:#0f0;font:11px monospace;padding:6px;border-radius:6px;white-space:pre'; document.body.append(d); }
+      d.textContent = `inner ${innerWidth}x${innerHeight}
+screen ${screen.width}x${screen.height}
+client ${document.documentElement.clientHeight}
+standalone ${standalone}
+app ${app.offsetHeight}`;
+    }
+  };
+  fit();
+  ['resize', 'orientationchange', 'pageshow'].forEach(e => window.addEventListener(e, fit));
+  document.addEventListener('visibilitychange', fit);
+  setTimeout(fit, 120); setTimeout(fit, 600);
+}
+
 /* ---------- khởi động ---------- */
 async function init() {
   Object.assign(el, {
@@ -1108,6 +1133,7 @@ async function init() {
   // ?demo=1 tạo dữ liệu mẫu nếu máy còn trống; ?tab=stats|wallet|settings mở thẳng tab đó
   const qs = new URLSearchParams(location.search);
   if (qs.get('demo') === 'reset') await makeSample(true); else if (qs.has('demo') && !S.tx.length) await makeSample();
+  fitApp();
   renderAll();
   if (TITLES[qs.get('tab')]) setTab(qs.get('tab'));
   if (nRec) toast(`Đã ghi ${nRec} khoản định kỳ đến hạn`);

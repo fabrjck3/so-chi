@@ -810,3 +810,7 @@ body{position:fixed;inset:0;width:100%;height:100%;overflow:hidden;overscroll-be
 html:root #app{position:fixed;inset:0;height:auto;max-width:520px;margin-inline:auto}
 .view{overscroll-behavior-y:contain;-webkit-overflow-scrolling:touch}
 .sheet{overscroll-behavior:contain}
+
+/* nền html trùng màu đáy của app để dải thừa (nếu còn) không lộ ra */
+html{background:var(--bb-bg2,var(--bg))}
+body{background:var(--bb-bg2,var(--bg))}
