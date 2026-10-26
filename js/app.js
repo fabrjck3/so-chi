@@ -732,10 +732,15 @@ function openEntry() {
     // khung co giãn (bàn phím mở/đóng): giữ nguyên tin ở đáy, nội dung được đẩy lên hoặc hạ xuống theo khung
     // (nhớ khoảng cách tới đáy rồi đặt lại, không cộng trừ độ lệch vì trình duyệt có thể đã tự kẹp vị trí cuộn)
     // chỉ ghi nhận vị trí khi chính ngón tay cuộn (đang chạm hoặc đang trôi quán tính); cuộn do khung co giãn hay do code thì bỏ qua để không lệch dần
-    S.fb = 0; let touching = false, tEnd = 0, mine = -1;
-    log.addEventListener('touchstart', () => { touching = true; }, { passive: true });
-    log.addEventListener('touchend', () => { touching = false; tEnd = Date.now(); }, { passive: true });
-    log.addEventListener('scroll', () => { if ((touching || Date.now() - tEnd < 1500) && Math.abs(log.scrollTop - mine) > 1) S.fb = log.scrollHeight - log.scrollTop - log.clientHeight; }, { passive: true });
+    // chạm nhẹ (không kéo) hoặc khung đang co giãn thì không tính, vì chạm ra ngoài để cất bàn phím cũng làm danh sách xê dịch
+    S.fb = 0; let touching = false, dragged = false, tEnd = 0, mine = -1, ch = log.clientHeight;
+    log.addEventListener('touchstart', () => { touching = true; dragged = false; }, { passive: true });
+    log.addEventListener('touchmove', () => { dragged = true; }, { passive: true });
+    log.addEventListener('touchend', () => { touching = false; tEnd = dragged ? Date.now() : 0; }, { passive: true });
+    log.addEventListener('scroll', () => {
+      const resized = log.clientHeight !== ch; ch = log.clientHeight;
+      if (!resized && dragged && (touching || Date.now() - tEnd < 1500) && Math.abs(log.scrollTop - mine) > 1) S.fb = log.scrollHeight - log.scrollTop - log.clientHeight;
+    }, { passive: true });
     S.ro?.disconnect(); S.ro = new ResizeObserver(() => { const fb = S.fb < 40 ? 0 : S.fb, t = log.scrollHeight - log.clientHeight - fb; if (Math.abs(t - log.scrollTop) >= 1) { log.scrollTop = t; mine = log.scrollTop; } }); S.ro.observe(log);
     chatTouchLock(true); dbgMount(sh);
     // không tự mở bàn phím: trên iPhone, bàn phím tự bật rồi bị vuốt đóng làm danh sách kẹt cuộn tới khi chạm lại một lần
@@ -801,7 +806,7 @@ function dbgEv(k, s) {
 function dbgRender() {
   const p = $('#dbg'), l = $('#chatlog'); if (!p || !l) return;
   const vv = window.visualViewport, a = document.activeElement;
-  p.querySelector('.dbg-s').innerHTML = `v35 · log SH ${l.scrollHeight} CH ${l.clientHeight} ST ${Math.round(l.scrollTop)}<br>vv h ${vv ? Math.round(vv.height) : '-'} top ${vv ? Math.round(vv.offsetTop) : '-'} · scrollY ${Math.round(scrollY)} · innerH ${innerHeight} · tiêu điểm ${a && a !== document.body ? dbgDesc(a) : 'không'}`
+  p.querySelector('.dbg-s').innerHTML = `v36 · log SH ${l.scrollHeight} CH ${l.clientHeight} ST ${Math.round(l.scrollTop)}<br>vv h ${vv ? Math.round(vv.height) : '-'} top ${vv ? Math.round(vv.offsetTop) : '-'} · scrollY ${Math.round(scrollY)} · innerH ${innerHeight} · tiêu điểm ${a && a !== document.body ? dbgDesc(a) : 'không'}`
     + `<div class="dbg-ev">${DBG.ev.map(e => `<div><i>${e.t}${e.c > 1 ? '–' + e.t2 + ' ×' + e.c : ''}</i> ${e.s}</div>`).join('') || 'Chưa có sự kiện.'}</div>`;
 }
 function dbgApply() {
