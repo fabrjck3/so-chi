@@ -794,14 +794,14 @@ function dbgStart(e) {
 function dbgEv(k, s) {
   if (!DBG.on) return;
   const t = ((performance.now() - (DBG.t0 || 0)) / 1000).toFixed(1), last = DBG.ev[DBG.ev.length - 1];
-  if (last && last.k === k && (k === 'vv' || k === 'ws')) { last.s = s; last.c++; last.t2 = t; }
+  if (last && last.k === k && k !== 'vv' && (k === 'ws' || k === 'fix')) { last.s = s; last.c++; last.t2 = t; }
   else { DBG.ev.push({ k, s, t, c: 1 }); if (DBG.ev.length > 11) DBG.ev.shift(); }
   dbgRender();
 }
 function dbgRender() {
   const p = $('#dbg'), l = $('#chatlog'); if (!p || !l) return;
   const vv = window.visualViewport, a = document.activeElement;
-  p.querySelector('.dbg-s').innerHTML = `v33 · log SH ${l.scrollHeight} CH ${l.clientHeight} ST ${Math.round(l.scrollTop)}<br>vv h ${vv ? Math.round(vv.height) : '-'} top ${vv ? Math.round(vv.offsetTop) : '-'} · scrollY ${Math.round(scrollY)} · innerH ${innerHeight} · tiêu điểm ${a && a !== document.body ? dbgDesc(a) : 'không'}`
+  p.querySelector('.dbg-s').innerHTML = `v34 · log SH ${l.scrollHeight} CH ${l.clientHeight} ST ${Math.round(l.scrollTop)}<br>vv h ${vv ? Math.round(vv.height) : '-'} top ${vv ? Math.round(vv.offsetTop) : '-'} · scrollY ${Math.round(scrollY)} · innerH ${innerHeight} · tiêu điểm ${a && a !== document.body ? dbgDesc(a) : 'không'}`
     + `<div class="dbg-ev">${DBG.ev.map(e => `<div><i>${e.t}${e.c > 1 ? '–' + e.t2 + ' ×' + e.c : ''}</i> ${e.s}</div>`).join('') || 'Chưa có sự kiện.'}</div>`;
 }
 function dbgApply() {
@@ -825,7 +825,17 @@ function dbgMount(sh) {
     document.addEventListener('touchcancel', () => { if (S.chat) dbgEv('c', '<b>iOS HUỶ cú chạm</b>'); }, { passive: true });
     document.addEventListener('focusin', e => { if (S.chat) dbgEv('f', 'focus ' + dbgDesc(e.target)); });
     document.addEventListener('focusout', e => { if (S.chat) dbgEv('f', 'blur ' + dbgDesc(e.target)); });
-    if (vv) { const f = () => { if (S.chat) dbgEv('vv', `vv h ${Math.round(vv.height)} top ${Math.round(vv.offsetTop)}`); }; vv.addEventListener('resize', f); vv.addEventListener('scroll', f); }
+    // gộp các lần đổi vùng nhìn liền nhau thành một dòng: cao từ→tới, độ lệch trên lớn nhất, trang cuộn lớn nhất
+    if (vv) {
+      const f = ev => {
+        if (!S.chat) return;
+        const h = Math.round(vv.height), t = Math.round(vv.offsetTop), y = Math.round(scrollY), last = DBG.ev[DBG.ev.length - 1];
+        if (last && last.k === 'vv') { last.h1 = h; last.tm = Math.max(last.tm, t); last.ym = Math.max(last.ym, y); last.c++; last.t2 = ((performance.now() - DBG.t0) / 1000).toFixed(1); }
+        else { dbgEv('vv', ''); Object.assign(DBG.ev[DBG.ev.length - 1], { h0: h, h1: h, tm: t, ym: y }); }
+        const e = DBG.ev[DBG.ev.length - 1]; e.s = `vv cao ${e.h0}→${e.h1} · lệch trên max <b>${e.tm}</b> · trang cuộn max ${e.ym}`; dbgRender();
+      };
+      vv.addEventListener('resize', f); vv.addEventListener('scroll', f);
+    }
     // nhịp 200ms: nếu hai nhịp cách nhau quá xa nghĩa là luồng chính của trang bị kẹt
     let last = performance.now();
     setInterval(() => { const now = performance.now(), gap = now - last; last = now; if (S.chat && $('#dbg') && gap > 600) dbgEv('lag', `<b>trang đứng ${Math.round(gap)}ms</b>`); }, 200);
@@ -1373,7 +1383,7 @@ async function init() {
     document.addEventListener('focusin', e => { if (e.target.id === 'q') { S.kbHold = 0; remeasure(); } });
     document.addEventListener('focusout', e => { if (e.target.id === 'q') remeasure(); });
     // dịch chuyển (kéo): chỉ cập nhật vị trí, tuyệt đối không cuộn danh sách để khỏi tranh với ngón tay
-    vv.addEventListener('scroll', () => { vars(); if (S.chat && vv.offsetTop > 0.5) window.scrollTo(0, 0); });
+    vv.addEventListener('scroll', () => { vars(); if (S.chat && vv.offsetTop > 0.5) { dbgEv('fix', 'app kéo trang về 0 (lệch ' + Math.round(vv.offsetTop) + ')'); window.scrollTo(0, 0); } });
   }
   // ?demo=1 tạo dữ liệu mẫu nếu máy còn trống; ?tab=stats|wallet|settings mở thẳng tab đó
   const qs = new URLSearchParams(location.search);
