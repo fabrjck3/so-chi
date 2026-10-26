@@ -963,3 +963,18 @@ button,[data-act],input,textarea,select{touch-action:manipulation}
 .sheet.chat .chat-h,.sheet.chat .grab{transition:max-height .24s cubic-bezier(.4,0,.5,1),margin .24s cubic-bezier(.4,0,.5,1),opacity .2s ease}
 #app.kbopen .sheet.chat .chat-h,#app.kbopen .sheet.chat .grab{transition:max-height .4s cubic-bezier(.16,1,.3,1) .02s,margin .4s cubic-bezier(.16,1,.3,1) .02s,opacity .15s ease}
 #app.kbopen.kbanim .sheet.chat{transition:transform .5s cubic-bezier(.22,1,.36,1),opacity .22s ease,bottom .4s cubic-bezier(.16,1,.3,1) .02s,height .4s cubic-bezier(.16,1,.3,1) .02s,border-radius .4s ease .02s,padding .4s ease .02s}
+
+/* ===== v43: mở/đóng bàn phím chỉ DỊCH khung (thuộc tính translate), không đổi kích thước hay vị trí bố cục.
+   Dịch được iOS chạy trên luồng vẽ riêng như khi cuộn (mượt, không phụ thuộc trang đang bận); đổi bottom/height thì mỗi khung hình
+   trang phải tính lại bố cục và vẽ lại lớp kính nên chỉ đạt khoảng 60 hình/giây và hay khựng.
+   Khi bàn phím mở, phần đầu khung (tiêu đề) trượt ra khỏi mép trên màn hình; dải dưới thanh trạng thái được che bằng .sbcover.
+   Nhịp đo từ video: mở = hãm dần theo hàm mũ (~0,4 giây, bắt đầu khi iOS báo đổi vùng nhìn); đóng = ~0,13 giây. ===== */
+.sheet.chat{bottom:calc(8px + env(safe-area-inset-bottom,0px));height:min(80%,calc(100% - 70px),720px);max-height:none;translate:0 0}
+.sheet.chat.on{transition:transform .5s cubic-bezier(.22,1,.36,1),opacity .22s ease,visibility 0s,translate .14s cubic-bezier(.25,.1,.4,1)}
+#app.kbopen .sheet.chat{top:auto;bottom:calc(8px + env(safe-area-inset-bottom,0px));height:min(80%,calc(100% - 70px),720px);max-height:none;padding:16px;border-radius:34px;
+  translate:0 calc(8px + env(safe-area-inset-bottom,0px) + 10px - var(--kb,0px));transition:transform .5s cubic-bezier(.22,1,.36,1),opacity .22s ease,visibility 0s,translate .4s cubic-bezier(.16,1,.3,1)}
+#app.kbopen .sheet.chat .chat-h{display:flex;max-height:64px;margin-bottom:6px;opacity:1}
+#app.kbopen .sheet.chat .grab{display:block;max-height:5px;margin:-4px auto 12px;opacity:1}
+#app.kbopen .sheet.chat .chat-log{padding-top:6px}
+.sbcover{position:absolute;left:0;right:0;top:0;height:calc(env(safe-area-inset-top,0px) + 14px);background:linear-gradient(var(--bg) 72%,transparent);z-index:32;pointer-events:none;opacity:0;transition:opacity .18s ease}
+#app.kbopen.sheetopen .sbcover{opacity:1}

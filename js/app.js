@@ -746,15 +746,13 @@ function openEntry() {
     // không tự mở bàn phím: trên iPhone, bàn phím tự bật rồi bị vuốt đóng làm danh sách kẹt cuộn tới khi chạm lại một lần
     const q = $('#q', sh);
     $('.chat-h h2', sh).addEventListener('click', dbgTap);
-    // chạm vào ô nhập: tự chọn ô với preventScroll để iOS không đẩy cả trang lên (đẩy trang làm khung nhảy và giật khi cất bàn phím).
-    // focusin sẽ đặt sẵn khung phía trên bàn phím trước khi bàn phím lên
+    // chạm vào ô nhập: tự chọn ô với preventScroll để iOS không đẩy cả trang lên (đẩy trang làm khung nhảy và giật khi cất bàn phím)
     let qy = 0; q.addEventListener('touchstart', e => { qy = e.touches[0].clientY; }, { passive: true });
     q.addEventListener('touchend', e => {
       if (document.activeElement === q || Math.abs(e.changedTouches[0].clientY - qy) > 10) return;
       e.preventDefault();
-      // iOS bỏ qua preventScroll và vẫn đẩy trang nếu thấy ô nhập ở thấp. Nên: đặt sẵn khung lên trên bàn phím, và trong lúc chọn ô
-      // thì tạm đưa hàng nhập lên cao (ẩn đi) để iOS thấy ô đã nằm gọn trong vùng nhìn, không đẩy trang. Bàn phím lên xong thì trả hàng nhập về
-      S.kbPrep?.();
+      // iOS bỏ qua preventScroll và vẫn đẩy trang nếu thấy ô nhập ở thấp. Nên trong lúc chọn ô, tạm đưa hàng nhập lên cao (ẩn đi)
+      // để iOS thấy ô đã nằm gọn trong vùng nhìn, không đẩy trang. Bàn phím lên xong thì trả hàng nhập về
       const row = q.closest('.chat-in'), r = row.getBoundingClientRect();
       row.style.transition = 'none'; row.style.opacity = '0'; row.style.transform = `translateY(${Math.round(90 - r.top)}px)`;
       S.rowHide = row; clearTimeout(S.rowT); S.rowT = setTimeout(rowShow, 450);
@@ -834,7 +832,7 @@ function dbgEv(k, s) {
 function dbgRender() {
   const p = $('#dbg'), l = $('#chatlog'); if (!p || !l) return;
   const vv = window.visualViewport, a = document.activeElement;
-  p.querySelector('.dbg-s').innerHTML = `v42 · log SH ${l.scrollHeight} CH ${l.clientHeight} ST ${Math.round(l.scrollTop)}<br>vv h ${vv ? Math.round(vv.height) : '-'} top ${vv ? Math.round(vv.offsetTop) : '-'} · scrollY ${Math.round(scrollY)} · innerH ${innerHeight} · tiêu điểm ${a && a !== document.body ? dbgDesc(a) : 'không'}`
+  p.querySelector('.dbg-s').innerHTML = `v43 · log SH ${l.scrollHeight} CH ${l.clientHeight} ST ${Math.round(l.scrollTop)}<br>vv h ${vv ? Math.round(vv.height) : '-'} top ${vv ? Math.round(vv.offsetTop) : '-'} · scrollY ${Math.round(scrollY)} · innerH ${innerHeight} · tiêu điểm ${a && a !== document.body ? dbgDesc(a) : 'không'}`
     + `<div class="dbg-ev">${DBG.ev.map(e => `<div><i>${e.t}${e.c > 1 ? '–' + e.t2 + ' ×' + e.c : ''}</i> ${e.s}</div>`).join('') || 'Chưa có sự kiện.'}</div>`;
 }
 function dbgApply() {
@@ -878,7 +876,7 @@ function dbgMount(sh) {
     if (k === 'off') { DBG.on = false; try { localStorage.setItem('dbgScroll', '0'); } catch {} p.remove(); return; }
     if (k === 'clr') { DBG.ev = []; DBG.tr = []; }
     else if (k === 'copy') {
-      const txt = 'SoChi v42 ' + (navigator.userAgent.match(/OS [\d_]+/) || [''])[0] + ' innerH ' + innerHeight + '\n' + (DBG.tr || []).map(t => t.kind + ' ' + t.f.join(' ')).join('\n');
+      const txt = 'SoChi v43 ' + (navigator.userAgent.match(/OS [\d_]+/) || [''])[0] + ' innerH ' + innerHeight + '\n' + (DBG.tr || []).map(t => t.kind + ' ' + t.f.join(' ')).join('\n');
       const done = ok => { b.textContent = ok ? 'Đã chép ✓' : 'Không chép được'; setTimeout(() => { b.textContent = 'Chép số đo'; }, 1500); };
       navigator.clipboard?.writeText(txt).then(() => done(true), () => done(false)) ?? done(false);
       return;
@@ -1436,11 +1434,12 @@ async function init() {
       app.style.setProperty('--kb', S.kbH + 'px'); app.style.setProperty('--vvh', (window.innerHeight - S.kbH) + 'px'); app.style.setProperty('--vvt', '0px');
       app.classList.add('kbopen');
     };
-    document.addEventListener('focusin', e => { if (e.target.id === 'q') { S.kbHold = 0; kbPre(); remeasure(); } });
+    // khung chỉ dịch lên khi iOS báo vùng nhìn đổi (đúng lúc bàn phím bắt đầu chạy), không đặt sẵn trước
+    document.addEventListener('focusin', e => { if (e.target.id === 'q') { S.kbHold = 0; remeasure(); } });
     // bỏ chọn ô nhập (chạm ra ngoài, dấu ✓, gửi): cho khung trượt xuống ngay cùng lúc bàn phím bắt đầu cất, không đợi iOS báo xong
     document.addEventListener('focusout', e => {
       if (e.target.id !== 'q') return;
-      if (app.classList.contains('kbopen')) { S.kbHold = Date.now() + 700; S.kbPre = 0; app.classList.remove('kbopen', 'kbanim'); app.style.setProperty('--kb', '0px'); }
+      if (app.classList.contains('kbopen')) { S.kbHold = Date.now() + 700; S.kbPre = 0; app.classList.remove('kbopen', 'kbanim'); }
       remeasure();
     });
     // dịch chuyển: chỉ cập nhật vị trí. Không kéo trang về 0 khi iOS tự đẩy trang lên lúc chọn ô nhập:
