@@ -589,7 +589,7 @@ function renderAllExceptSettings() { S.dirty = new Set(['home', 'log', 'stats', 
 
 /* ---------- sheet ---------- */
 function openSheet(html, mount, cls = '') {
-  S.chat = cls === 'chat'; if (!S.chat) chatTouchLock(false);
+  S.chat = cls === 'chat'; if (!S.chat) { chatTouchLock(false); dbgReset(); }
   el.sheet.innerHTML = '<div class="grab"></div>' + html;
   el.sheet.className = 'sheet on' + (cls ? ' ' + cls : ''); el.scrim.classList.add('on'); el.sheet.scrollTop = 0; $('#app').classList.add('sheetopen'); $('main').inert = true; $('.dock').inert = true;
   mount?.(el.sheet);
@@ -723,7 +723,7 @@ function refreshChat() {
 }
 function openEntry() {
   openSheet(`<div class="chat-h"><h2>Nhập chi tiêu</h2><div class="chat-tools"><button class="link" data-act="kp">Bàn phím số</button><button class="link" data-act="manual">Nhập tay</button></div></div>
-    ${DBG.on ? '<div class="dbg" id="dbg"><div class="dbg-s"></div><div class="dbg-b">' + [['nolock', 'Khoá chạm'], ['pan', 'pan-y'], ['mt', 'Neo đáy'], ['ovf', 'Sheet hidden']].map(([k, t]) => `<button type="button" data-dbg="${k}" data-t="${t}"></button>`).join('') + '<button type="button" data-dbg="fake">+15 tin thử</button><button type="button" data-dbg="re">Làm mới lớp cuộn</button><button type="button" data-dbg="off">Ẩn bảng</button></div></div>' : ''}
+    ${DBG.on ? '<div class="dbg" id="dbg"><div class="dbg-s"></div><div class="dbg-b">' + [['nolock', 'Khoá chạm'], ['pan', 'pan-y'], ['mt', 'Neo đáy'], ['ovf', 'Sheet hidden'], ['scrim', 'Nền mờ chặn chạm'], ['glass', 'Kính'], ['wc', 'will-change']].map(([k, t]) => `<button type="button" data-dbg="${k}" data-t="${t}"></button>`).join('') + '<button type="button" data-dbg="fake">+15 tin thử</button><button type="button" data-dbg="re">Làm mới lớp cuộn</button><button type="button" data-dbg="off">Ẩn bảng</button></div></div>' : ''}
     <div class="chat-log" id="chatlog">${chatLogHTML()}</div>
     <div class="chat-in"><button class="clip" data-act="paste" aria-label="Dán tin nhắn ngân hàng"><svg viewBox="0 0 24 24"><path d="M9 4h6v3H9zM7 6H6a1 1 0 0 0-1 1v13a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V7a1 1 0 0 0-1-1h-1"/></svg></button>
       ${S.set.altInput ? '<div class="inp ce" id="q" contenteditable="plaintext-only" role="textbox" enterkeyhint="send" autocapitalize="sentences" data-ph="Gõ một câu, ví dụ 45k phở" aria-label="Câu nhập"></div>' : '<textarea class="inp" id="q" rows="1" enterkeyhint="send" autocomplete="off" placeholder="Gõ một câu, ví dụ 45k phở" aria-label="Câu nhập"></textarea>'}
@@ -761,7 +761,7 @@ function chatTouchLock(on) {
   }
 }
 /* chẩn đoán cuộn (tạm thời): đo ngay trên iPhone xem cú kéo bị ai chặn, rồi bật tắt từng nghi phạm để thử */
-const DBG = { on: (() => { try { return localStorage.getItem('dbgScroll') !== '0'; } catch { return true; } })(), nolock: false, pan: true, mt: true, ovf: true, n: 0, g: null, hist: [] };
+const DBG = { on: (() => { try { return localStorage.getItem('dbgScroll') !== '0'; } catch { return true; } })(), nolock: false, pan: true, mt: true, ovf: true, scrim: true, glass: true, wc: true, n: 0, g: null, hist: [] };
 function dbgDesc(n) {
   if (!n) return '∅';
   if (n.nodeType !== 1) return '#' + n.nodeName.toLowerCase();
@@ -780,9 +780,9 @@ function dbgRender() {
     DBG.raf = 0; const p = $('#dbg'), l = $('#chatlog'); if (!p || !l) return;
     const se = document.scrollingElement, cs = getComputedStyle(l), st = getComputedStyle(el.sheet), on = v => v ? 'bật' : 'tắt';
     const rows = DBG.hist.map(g => `<div>#${g.n} chạm <b>${g.tgt}</b>${g.hit !== g.tgt ? ' · điểm ' + g.hit : ''} · trong log ${g.inLog ? 'có' : '<b>KHÔNG</b>'}<br>&nbsp; kéo ${g.mv} lần · dy ${g.dy > 0 ? '+' : ''}${g.dy} · lần đầu <b>${g.first || '-'}</b> · chặn ${g.pv} · log cuộn ${g.ls} (ST ${g.st0}→${Math.round(l.scrollTop)}) · trang cuộn ${g.ds}</div>`).join('');
-    p.querySelector('.dbg-s').innerHTML = `v27 · log SH ${l.scrollHeight} CH ${l.clientHeight} ST ${Math.round(l.scrollTop)} · ov ${cs.overflowY} · ta ${cs.touchAction} · sheet ov ${st.overflowY}<br>kb ${getComputedStyle($('#app')).getPropertyValue('--kb').trim() || 0} · trang ST ${se ? Math.round(se.scrollTop) : 0} · innerH ${innerHeight}${rows || '<div>Kéo thử trong danh sách tin nhắn.</div>'}`;
+    p.querySelector('.dbg-s').innerHTML = `v28 · log SH ${l.scrollHeight} CH ${l.clientHeight} ST ${Math.round(l.scrollTop)} · ov ${cs.overflowY} · ta ${cs.touchAction} · sheet ov ${st.overflowY}<br>kb ${getComputedStyle($('#app')).getPropertyValue('--kb').trim() || 0} · trang ST ${se ? Math.round(se.scrollTop) : 0} · innerH ${innerHeight}${rows || '<div>Kéo thử trong danh sách tin nhắn.</div>'}`;
     // cập nhật nút tại chỗ, không thay phần tử: iOS huỷ cú bấm nếu nút bị thay giữa lúc chạm và lúc nhấc tay
-    const st8 = { nolock: !DBG.nolock, pan: DBG.pan, mt: DBG.mt, ovf: DBG.ovf };
+    const st8 = { nolock: !DBG.nolock, pan: DBG.pan, mt: DBG.mt, ovf: DBG.ovf, scrim: DBG.scrim, glass: DBG.glass, wc: DBG.wc };
     p.querySelectorAll('.dbg-b [data-t]').forEach(b => { const v = st8[b.dataset.dbg]; b.classList.toggle('on', v); b.textContent = b.dataset.t + ': ' + on(v); });
   });
 }
@@ -790,8 +790,12 @@ function dbgApply() {
   const l = $('#chatlog'); if (!l) return;
   l.style.touchAction = DBG.pan ? '' : 'auto';
   l.classList.toggle('nomt', !DBG.mt);
-  el.sheet.style.overflow = DBG.ovf ? '' : 'visible';
+  const ss = el.sheet.style; ss.overflow = DBG.ovf ? '' : 'visible';
+  el.scrim.style.touchAction = DBG.scrim ? '' : 'auto';
+  ss.backdropFilter = ss.webkitBackdropFilter = DBG.glass ? '' : 'none';
+  ss.willChange = DBG.wc ? '' : 'auto';
 }
+function dbgReset() { const ss = el.sheet.style; ss.overflow = ss.backdropFilter = ss.webkitBackdropFilter = ss.willChange = ''; el.scrim.style.touchAction = ''; }
 function dbgMount(sh) {
   const p = $('#dbg', sh), l = $('#chatlog', sh); if (!p) return;
   dbgApply();
