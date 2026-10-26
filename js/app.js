@@ -723,14 +723,16 @@ function refreshChat() {
 }
 function openEntry() {
   openSheet(`<div class="chat-h"><h2>Nhập chi tiêu</h2><div class="chat-tools"><button class="link" data-act="kp">Bàn phím số</button><button class="link" data-act="manual">Nhập tay</button></div></div>
-    ${DBG.on ? '<div class="dbg" id="dbg"><div class="dbg-b"><button type="button" data-dbg="nofocus"></button><button type="button" data-dbg="fake">+15 tin thử</button><button type="button" data-dbg="clr">Xoá nhật ký</button><button type="button" data-dbg="off">Ẩn bảng</button></div><div class="dbg-s"></div></div>' : ''}
+    ${DBG.on ? '<div class="dbg" id="dbg"><div class="dbg-b"><button type="button" data-dbg="fake">+15 tin thử</button><button type="button" data-dbg="clr">Xoá nhật ký</button><button type="button" data-dbg="off">Ẩn bảng</button></div><div class="dbg-s"></div></div>' : ''}
     <div class="chat-log" id="chatlog">${chatLogHTML()}</div>
     <div class="chat-in"><button class="clip" data-act="paste" aria-label="Dán tin nhắn ngân hàng"><svg viewBox="0 0 24 24"><path d="M9 4h6v3H9zM7 6H6a1 1 0 0 0-1 1v13a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V7a1 1 0 0 0-1-1h-1"/></svg></button>
       ${S.set.altInput ? '<div class="inp ce" id="q" contenteditable="plaintext-only" role="textbox" enterkeyhint="send" autocapitalize="sentences" data-ph="Gõ một câu, ví dụ 45k phở" aria-label="Câu nhập"></div>' : '<textarea class="inp" id="q" rows="1" enterkeyhint="send" autocomplete="off" placeholder="Gõ một câu, ví dụ 45k phở" aria-label="Câu nhập"></textarea>'}
       <button class="send" data-act="send" aria-label="Gửi"><svg viewBox="0 0 24 24"><path d="M12 19V5M6 11l6-6 6 6"/></svg></button></div>`, sh => {
     const log = $('#chatlog', sh); log.scrollTop = log.scrollHeight;
     chatTouchLock(true); dbgMount(sh);
-    const q = $('#q', sh); if (!DBG.nofocus) q.focus({ preventScroll: true });
+    // không tự mở bàn phím: trên iPhone, bàn phím tự bật rồi bị vuốt đóng làm danh sách kẹt cuộn tới khi chạm lại một lần
+    const q = $('#q', sh);
+    $('.chat-h h2', sh).addEventListener('click', dbgTap);
     q.addEventListener('focus', () => setTimeout(() => { const l = $('#chatlog'); if (l) l.scrollTop = l.scrollHeight; }, 320));
     q.addEventListener('input', () => { if (q.isContentEditable) { if (!q.textContent) q.innerHTML = ''; return; } q.style.height = 'auto'; q.style.height = Math.min(110, q.scrollHeight) + 'px'; });
     sh.addEventListener('mousedown', e => { if (e.target.closest('.chat-log button, .chat-in button')) e.preventDefault(); });
@@ -761,12 +763,18 @@ function chatTouchLock(on) {
   }
 }
 /* chẩn đoán cuộn (tạm thời): đo ngay trên iPhone xem cú kéo bị ai chặn, rồi bật tắt từng nghi phạm để thử */
-const DBG = { on: (() => { try { return localStorage.getItem('dbgScroll') !== '0'; } catch { return true; } })(), nolock: false, pan: true, mt: true, ovf: true, scrim: true, glass: true, wc: true, g: null, ev: [], nofocus: (() => { try { return localStorage.getItem('dbgNoFocus') === '1'; } catch { return false; } })() };
+const DBG = { on: (() => { try { return localStorage.getItem('dbgScroll') === '1'; } catch { return false; } })(), nolock: false, pan: true, mt: true, ovf: true, scrim: true, glass: true, wc: true, g: null, ev: [] };
 function dbgDesc(n) {
   if (!n) return '∅';
   if (n.nodeType !== 1) return '#' + n.nodeName.toLowerCase();
   const c = typeof n.className === 'string' ? n.className.trim().split(/\s+/).filter(Boolean).slice(0, 2).join('.') : '';
   return n.tagName.toLowerCase() + (n.id ? '#' + n.id : '') + (c ? '.' + c : '');
+}
+/* chạm tiêu đề "Nhập chi tiêu" 3 lần liền để bật lại bảng chẩn đoán */
+function dbgTap() {
+  const now = Date.now(); DBG.taps = (DBG.taps || []).filter(t => now - t < 1200).concat(now);
+  if (DBG.taps.length < 3) return;
+  DBG.taps = []; DBG.on = true; try { localStorage.setItem('dbgScroll', '1'); } catch {} openEntry();
 }
 function dbgStart(e) {
   if (!DBG.on) return;
@@ -785,9 +793,8 @@ function dbgEv(k, s) {
 function dbgRender() {
   const p = $('#dbg'), l = $('#chatlog'); if (!p || !l) return;
   const vv = window.visualViewport, a = document.activeElement;
-  p.querySelector('.dbg-s').innerHTML = `v29 · log SH ${l.scrollHeight} CH ${l.clientHeight} ST ${Math.round(l.scrollTop)}<br>vv h ${vv ? Math.round(vv.height) : '-'} top ${vv ? Math.round(vv.offsetTop) : '-'} · scrollY ${Math.round(scrollY)} · innerH ${innerHeight} · tiêu điểm ${a && a !== document.body ? dbgDesc(a) : 'không'}`
+  p.querySelector('.dbg-s').innerHTML = `v30 · log SH ${l.scrollHeight} CH ${l.clientHeight} ST ${Math.round(l.scrollTop)}<br>vv h ${vv ? Math.round(vv.height) : '-'} top ${vv ? Math.round(vv.offsetTop) : '-'} · scrollY ${Math.round(scrollY)} · innerH ${innerHeight} · tiêu điểm ${a && a !== document.body ? dbgDesc(a) : 'không'}`
     + `<div class="dbg-ev">${DBG.ev.map(e => `<div><i>${e.t}${e.c > 1 ? '–' + e.t2 + ' ×' + e.c : ''}</i> ${e.s}</div>`).join('') || 'Chưa có sự kiện.'}</div>`;
-  const nf = p.querySelector('[data-dbg=nofocus]'); if (nf) { nf.classList.toggle('on', !DBG.nofocus); nf.textContent = 'Tự mở bàn phím: ' + (DBG.nofocus ? 'tắt' : 'bật'); }
 }
 function dbgApply() {
   const l = $('#chatlog'); if (!l) return;
@@ -818,8 +825,7 @@ function dbgMount(sh) {
   p.addEventListener('click', e => {
     const b = e.target.closest('[data-dbg]'); if (!b) return; const k = b.dataset.dbg;
     if (k === 'off') { DBG.on = false; try { localStorage.setItem('dbgScroll', '0'); } catch {} p.remove(); return; }
-    if (k === 'nofocus') { DBG.nofocus = !DBG.nofocus; try { localStorage.setItem('dbgNoFocus', DBG.nofocus ? '1' : '0'); } catch {} }
-    else if (k === 'clr') DBG.ev = [];
+    if (k === 'clr') DBG.ev = [];
     else if (k === 'fake') {
       // tin giả chỉ để có chỗ kéo thử: chỉ nằm trên màn hình, không lưu, đóng khung là mất
       const lg = $('#chatlog'), f = document.createElement('div'); f.className = 'cb-fake';
