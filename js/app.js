@@ -723,7 +723,7 @@ function refreshChat() {
 }
 function openEntry() {
   openSheet(`<div class="chat-h"><h2>Nhập chi tiêu</h2><div class="chat-tools"><button class="link" data-act="kp">Bàn phím số</button><button class="link" data-act="manual">Nhập tay</button></div></div>
-    ${DBG.on ? '<div class="dbg" id="dbg"><div class="dbg-s"></div><div class="dbg-b"></div></div>' : ''}
+    ${DBG.on ? '<div class="dbg" id="dbg"><div class="dbg-s"></div><div class="dbg-b">' + [['nolock', 'Khoá chạm'], ['pan', 'pan-y'], ['mt', 'Neo đáy'], ['ovf', 'Sheet hidden']].map(([k, t]) => `<button type="button" data-dbg="${k}" data-t="${t}"></button>`).join('') + '<button type="button" data-dbg="fake">+15 tin thử</button><button type="button" data-dbg="re">Làm mới lớp cuộn</button><button type="button" data-dbg="off">Ẩn bảng</button></div></div>' : ''}
     <div class="chat-log" id="chatlog">${chatLogHTML()}</div>
     <div class="chat-in"><button class="clip" data-act="paste" aria-label="Dán tin nhắn ngân hàng"><svg viewBox="0 0 24 24"><path d="M9 4h6v3H9zM7 6H6a1 1 0 0 0-1 1v13a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V7a1 1 0 0 0-1-1h-1"/></svg></button>
       ${S.set.altInput ? '<div class="inp ce" id="q" contenteditable="plaintext-only" role="textbox" enterkeyhint="send" autocapitalize="sentences" data-ph="Gõ một câu, ví dụ 45k phở" aria-label="Câu nhập"></div>' : '<textarea class="inp" id="q" rows="1" enterkeyhint="send" autocomplete="off" placeholder="Gõ một câu, ví dụ 45k phở" aria-label="Câu nhập"></textarea>'}
@@ -745,6 +745,7 @@ function chatTouchLock(on) {
     S.tm = e => {
       const t = e.target, l = $('#chatlog'), dy = e.touches[0].clientY - S.y0; let why = '';
       if (t.closest && t.closest('textarea') && t.scrollHeight > t.clientHeight + 1) why = '';
+      else if (t.closest && t.closest('.dbg')) return;
       else if (!l || !(t.closest && t.closest('.chat-log'))) why = 'ngoài log';
       else {
         const atTop = l.scrollTop <= 0, atBottom = l.scrollTop + l.clientHeight >= l.scrollHeight - 1;
@@ -779,8 +780,10 @@ function dbgRender() {
     DBG.raf = 0; const p = $('#dbg'), l = $('#chatlog'); if (!p || !l) return;
     const se = document.scrollingElement, cs = getComputedStyle(l), st = getComputedStyle(el.sheet), on = v => v ? 'bật' : 'tắt';
     const rows = DBG.hist.map(g => `<div>#${g.n} chạm <b>${g.tgt}</b>${g.hit !== g.tgt ? ' · điểm ' + g.hit : ''} · trong log ${g.inLog ? 'có' : '<b>KHÔNG</b>'}<br>&nbsp; kéo ${g.mv} lần · dy ${g.dy > 0 ? '+' : ''}${g.dy} · lần đầu <b>${g.first || '-'}</b> · chặn ${g.pv} · log cuộn ${g.ls} (ST ${g.st0}→${Math.round(l.scrollTop)}) · trang cuộn ${g.ds}</div>`).join('');
-    p.querySelector('.dbg-s').innerHTML = `v26 · log SH ${l.scrollHeight} CH ${l.clientHeight} ST ${Math.round(l.scrollTop)} · ov ${cs.overflowY} · ta ${cs.touchAction} · sheet ov ${st.overflowY}<br>kb ${getComputedStyle($('#app')).getPropertyValue('--kb').trim() || 0} · trang ST ${se ? Math.round(se.scrollTop) : 0} · innerH ${innerHeight}${rows || '<div>Kéo thử trong danh sách tin nhắn.</div>'}`;
-    p.querySelector('.dbg-b').innerHTML = [['nolock', 'Khoá chạm', !DBG.nolock], ['pan', 'pan-y', DBG.pan], ['mt', 'Neo đáy', DBG.mt], ['ovf', 'Sheet hidden', DBG.ovf]].map(([k, t, v]) => `<button data-dbg="${k}" class="${v ? 'on' : ''}">${t}: ${on(v)}</button>`).join('') + '<button data-dbg="fake">+15 tin thử</button><button data-dbg="re">Làm mới lớp cuộn</button><button data-dbg="off">Ẩn bảng</button>';
+    p.querySelector('.dbg-s').innerHTML = `v27 · log SH ${l.scrollHeight} CH ${l.clientHeight} ST ${Math.round(l.scrollTop)} · ov ${cs.overflowY} · ta ${cs.touchAction} · sheet ov ${st.overflowY}<br>kb ${getComputedStyle($('#app')).getPropertyValue('--kb').trim() || 0} · trang ST ${se ? Math.round(se.scrollTop) : 0} · innerH ${innerHeight}${rows || '<div>Kéo thử trong danh sách tin nhắn.</div>'}`;
+    // cập nhật nút tại chỗ, không thay phần tử: iOS huỷ cú bấm nếu nút bị thay giữa lúc chạm và lúc nhấc tay
+    const st8 = { nolock: !DBG.nolock, pan: DBG.pan, mt: DBG.mt, ovf: DBG.ovf };
+    p.querySelectorAll('.dbg-b [data-t]').forEach(b => { const v = st8[b.dataset.dbg]; b.classList.toggle('on', v); b.textContent = b.dataset.t + ': ' + on(v); });
   });
 }
 function dbgApply() {
