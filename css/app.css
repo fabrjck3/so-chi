@@ -946,3 +946,11 @@ button,[data-act],input,textarea,select{touch-action:manipulation}
 /* bàn phím mở/đóng: khung chat luôn neo theo đáy vùng nhìn. Mở thì bám ngay theo bàn phím (không trễ), đóng thì trượt xuống cùng bàn phím */
 #app.kbopen .sheet.chat{top:auto;bottom:var(--kb,0px);height:calc(var(--vvh,600px) - env(safe-area-inset-top,0px) - 4px)}
 .sheet.chat.on{transition:transform .5s cubic-bezier(.22,1,.36,1),opacity .22s ease,visibility 0s,bottom .34s cubic-bezier(.25,.9,.3,1),height .34s cubic-bezier(.25,.9,.3,1),border-radius .34s ease,padding .34s ease}
+
+/* mở/đóng bàn phím mượt: tiêu đề và thanh kéo thu gọn dần thay vì biến mất tức thì; khung trượt cùng nhịp bàn phím */
+.sheet.chat .chat-h,.sheet.chat .grab{overflow:hidden;transition:max-height .36s cubic-bezier(.2,.9,.25,1),margin .36s cubic-bezier(.2,.9,.25,1),opacity .2s ease}
+.sheet.chat .chat-h{max-height:64px}
+.sheet.chat .grab{max-height:5px}
+#app.kbopen .sheet.chat .chat-h{display:flex;max-height:0;margin-bottom:0;opacity:0}
+#app.kbopen .sheet.chat .grab{display:block;max-height:0;margin-top:0;margin-bottom:0;opacity:0}
+#app.kbopen.kbanim .sheet.chat{transition:transform .5s cubic-bezier(.22,1,.36,1),opacity .22s ease,bottom .36s cubic-bezier(.2,.9,.25,1),height .36s cubic-bezier(.2,.9,.25,1),border-radius .36s ease,padding .36s ease}

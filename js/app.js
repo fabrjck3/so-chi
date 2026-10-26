@@ -822,7 +822,7 @@ function dbgEv(k, s) {
 function dbgRender() {
   const p = $('#dbg'), l = $('#chatlog'); if (!p || !l) return;
   const vv = window.visualViewport, a = document.activeElement;
-  p.querySelector('.dbg-s').innerHTML = `v39 · log SH ${l.scrollHeight} CH ${l.clientHeight} ST ${Math.round(l.scrollTop)}<br>vv h ${vv ? Math.round(vv.height) : '-'} top ${vv ? Math.round(vv.offsetTop) : '-'} · scrollY ${Math.round(scrollY)} · innerH ${innerHeight} · tiêu điểm ${a && a !== document.body ? dbgDesc(a) : 'không'}`
+  p.querySelector('.dbg-s').innerHTML = `v40 · log SH ${l.scrollHeight} CH ${l.clientHeight} ST ${Math.round(l.scrollTop)}<br>vv h ${vv ? Math.round(vv.height) : '-'} top ${vv ? Math.round(vv.offsetTop) : '-'} · scrollY ${Math.round(scrollY)} · innerH ${innerHeight} · tiêu điểm ${a && a !== document.body ? dbgDesc(a) : 'không'}`
     + `<div class="dbg-ev">${DBG.ev.map(e => `<div><i>${e.t}${e.c > 1 ? '–' + e.t2 + ' ×' + e.c : ''}</i> ${e.s}</div>`).join('') || 'Chưa có sự kiện.'}</div>`;
 }
 function dbgApply() {
@@ -1413,11 +1413,18 @@ async function init() {
     const kbPre = S.kbPrep = () => {
       if (!S.chat || app.classList.contains('kbopen')) return;
       S.kbPre = Date.now() + 800;
+      // kbanim: khung trượt lên cùng nhịp bàn phím (bàn phím iOS lên mất khoảng 0,35 giây), xong thì bỏ để các lần đo sau bám tức thì
+      app.classList.add('kbanim'); clearTimeout(S.kbAnimT); S.kbAnimT = setTimeout(() => app.classList.remove('kbanim'), 500);
       app.style.setProperty('--kb', S.kbH + 'px'); app.style.setProperty('--vvh', (window.innerHeight - S.kbH) + 'px'); app.style.setProperty('--vvt', '0px');
       app.classList.add('kbopen');
     };
     document.addEventListener('focusin', e => { if (e.target.id === 'q') { S.kbHold = 0; kbPre(); remeasure(); } });
-    document.addEventListener('focusout', e => { if (e.target.id === 'q') remeasure(); });
+    // bỏ chọn ô nhập (chạm ra ngoài, dấu ✓, gửi): cho khung trượt xuống ngay cùng lúc bàn phím bắt đầu cất, không đợi iOS báo xong
+    document.addEventListener('focusout', e => {
+      if (e.target.id !== 'q') return;
+      if (app.classList.contains('kbopen')) { S.kbHold = Date.now() + 700; S.kbPre = 0; app.classList.remove('kbopen', 'kbanim'); app.style.setProperty('--kb', '0px'); }
+      remeasure();
+    });
     // dịch chuyển: chỉ cập nhật vị trí. Không kéo trang về 0 khi iOS tự đẩy trang lên lúc chọn ô nhập:
     // kéo về làm iOS nhớ sai vị trí, tới lúc cất bàn phím cả màn hình giật xuống một cái. Khung chat đã tự bám theo --kb nên không cần
     // dự phòng: nếu iOS vẫn đẩy trang thì kéo về 0, vì khi trang bị đẩy, vị trí khung tính theo số iOS báo không khớp màn hình (khung lệch, ô nhập bị che)
