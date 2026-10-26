@@ -919,3 +919,12 @@ button,[data-act],input,textarea,select{touch-action:manipulation}
 @media (prefers-reduced-motion:reduce){.cb-g.new .cb-me,.cb-g.new .cb-ai,.cb-g.chg .cb-ai,.cb-g.out{animation:none}}
 
 .cb-ai.chg-ai{animation:cbPop .42s cubic-bezier(.34,1.4,.64,1) both}
+
+
+/* khung chat: không tự cuộn, không kéo trôi; bàn phím mở thì gọn tiêu đề để hiện nhiều tin hơn */
+.sheet.chat{overflow:hidden;overscroll-behavior:none}
+.chat-log{-webkit-overflow-scrolling:touch;touch-action:pan-y}
+.chat-in textarea,.chat-in .inp{touch-action:manipulation}
+#app.kbopen .sheet.chat .chat-h,#app.kbopen .sheet.chat .grab{display:none}
+#app.kbopen .sheet.chat{padding-top:10px}
+#app.kbopen .sheet.chat .chat-log{padding-top:2px}

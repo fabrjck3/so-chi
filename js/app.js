@@ -728,6 +728,15 @@ function openEntry() {
       ${S.set.altInput ? '<div class="inp ce" id="q" contenteditable="plaintext-only" role="textbox" enterkeyhint="send" autocapitalize="sentences" data-ph="Gõ một câu, ví dụ 45k phở" aria-label="Câu nhập"></div>' : '<textarea class="inp" id="q" rows="1" enterkeyhint="send" autocomplete="off" placeholder="Gõ một câu, ví dụ 45k phở" aria-label="Câu nhập"></textarea>'}
       <button class="send" data-act="send" aria-label="Gửi"><svg viewBox="0 0 24 24"><path d="M12 19V5M6 11l6-6 6 6"/></svg></button></div>`, sh => {
     const log = $('#chatlog', sh); log.scrollTop = log.scrollHeight;
+    // chỉ danh sách tin nhắn được cuộn; kéo ở chỗ khác hoặc kéo quá đầu/cuối không làm cả khung trôi theo
+    let y0 = 0;
+    sh.addEventListener('touchstart', e => { y0 = e.touches[0].clientY; }, { passive: true });
+    sh.addEventListener('touchmove', e => {
+      const inLog = e.target.closest && e.target.closest('.chat-log');
+      if (!inLog) { if (!e.target.closest('textarea')) e.preventDefault(); return; }
+      const dy = e.touches[0].clientY - y0, atTop = log.scrollTop <= 0, atBottom = log.scrollTop + log.clientHeight >= log.scrollHeight - 1;
+      if (log.scrollHeight <= log.clientHeight + 1 || (atTop && dy > 0) || (atBottom && dy < 0)) e.preventDefault();
+    }, { passive: false });
     const q = $('#q', sh); q.focus({ preventScroll: true });
     q.addEventListener('focus', () => setTimeout(() => { const l = $('#chatlog'); if (l) l.scrollTop = l.scrollHeight; }, 320));
     q.addEventListener('input', () => { if (q.isContentEditable) { if (!q.textContent) q.innerHTML = ''; return; } q.style.height = 'auto'; q.style.height = Math.min(110, q.scrollHeight) + 'px'; });
