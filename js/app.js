@@ -719,7 +719,7 @@ function refreshChat() {
     }
     prev = g; lastDay = d;
   });
-  if (stick) requestAnimationFrame(() => log.scrollTo({ top: log.scrollHeight, behavior: 'smooth' }));
+  if (stick) { S.fb = 0; requestAnimationFrame(() => log.scrollTo({ top: log.scrollHeight, behavior: 'smooth' })); }
 }
 function openEntry() {
   openSheet(`<div class="chat-h"><h2>Nhập chi tiêu</h2><div class="chat-tools"><button class="link" data-act="kp">Bàn phím số</button><button class="link" data-act="manual">Nhập tay</button></div></div>
@@ -731,9 +731,12 @@ function openEntry() {
     const log = $('#chatlog', sh); log.scrollTop = log.scrollHeight;
     // khung co giãn (bàn phím mở/đóng): giữ nguyên tin ở đáy, nội dung được đẩy lên hoặc hạ xuống theo khung
     // (nhớ khoảng cách tới đáy rồi đặt lại, không cộng trừ độ lệch vì trình duyệt có thể đã tự kẹp vị trí cuộn)
-    let fb = 0, own = false;
-    log.addEventListener('scroll', () => { if (own) { own = false; return; } fb = log.scrollHeight - log.scrollTop - log.clientHeight; }, { passive: true });
-    S.ro?.disconnect(); S.ro = new ResizeObserver(() => { const t = log.scrollHeight - log.clientHeight - fb; if (Math.abs(t - log.scrollTop) >= 1) { own = true; log.scrollTop = t; } }); S.ro.observe(log);
+    // chỉ ghi nhận vị trí khi chính ngón tay cuộn (đang chạm hoặc đang trôi quán tính); cuộn do khung co giãn hay do code thì bỏ qua để không lệch dần
+    S.fb = 0; let touching = false, tEnd = 0, mine = -1;
+    log.addEventListener('touchstart', () => { touching = true; }, { passive: true });
+    log.addEventListener('touchend', () => { touching = false; tEnd = Date.now(); }, { passive: true });
+    log.addEventListener('scroll', () => { if ((touching || Date.now() - tEnd < 1500) && Math.abs(log.scrollTop - mine) > 1) S.fb = log.scrollHeight - log.scrollTop - log.clientHeight; }, { passive: true });
+    S.ro?.disconnect(); S.ro = new ResizeObserver(() => { const fb = S.fb < 40 ? 0 : S.fb, t = log.scrollHeight - log.clientHeight - fb; if (Math.abs(t - log.scrollTop) >= 1) { log.scrollTop = t; mine = log.scrollTop; } }); S.ro.observe(log);
     chatTouchLock(true); dbgMount(sh);
     // không tự mở bàn phím: trên iPhone, bàn phím tự bật rồi bị vuốt đóng làm danh sách kẹt cuộn tới khi chạm lại một lần
     const q = $('#q', sh);
@@ -798,7 +801,7 @@ function dbgEv(k, s) {
 function dbgRender() {
   const p = $('#dbg'), l = $('#chatlog'); if (!p || !l) return;
   const vv = window.visualViewport, a = document.activeElement;
-  p.querySelector('.dbg-s').innerHTML = `v32 · log SH ${l.scrollHeight} CH ${l.clientHeight} ST ${Math.round(l.scrollTop)}<br>vv h ${vv ? Math.round(vv.height) : '-'} top ${vv ? Math.round(vv.offsetTop) : '-'} · scrollY ${Math.round(scrollY)} · innerH ${innerHeight} · tiêu điểm ${a && a !== document.body ? dbgDesc(a) : 'không'}`
+  p.querySelector('.dbg-s').innerHTML = `v33 · log SH ${l.scrollHeight} CH ${l.clientHeight} ST ${Math.round(l.scrollTop)}<br>vv h ${vv ? Math.round(vv.height) : '-'} top ${vv ? Math.round(vv.offsetTop) : '-'} · scrollY ${Math.round(scrollY)} · innerH ${innerHeight} · tiêu điểm ${a && a !== document.body ? dbgDesc(a) : 'không'}`
     + `<div class="dbg-ev">${DBG.ev.map(e => `<div><i>${e.t}${e.c > 1 ? '–' + e.t2 + ' ×' + e.c : ''}</i> ${e.s}</div>`).join('') || 'Chưa có sự kiện.'}</div>`;
 }
 function dbgApply() {
