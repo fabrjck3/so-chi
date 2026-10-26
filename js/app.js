@@ -1264,13 +1264,19 @@ async function init() {
   ['home', 'log', 'stats', 'wallet', 'settings'].forEach(k => el[k].addEventListener('scroll', updatePill, { passive: true }));
   if (window.visualViewport) {
     const vv = window.visualViewport, app = $('#app');
-    const upd = () => {
+    const vars = () => {
       const kb = Math.max(0, window.innerHeight - vv.height - vv.offsetTop), open = window.innerHeight - vv.height > 120;
       app.style.setProperty('--kb', kb + 'px'); app.style.setProperty('--vvh', Math.round(vv.height) + 'px'); app.style.setProperty('--vvt', Math.round(vv.offsetTop) + 'px');
       app.classList.toggle('kbopen', open);
-      if (S.chat) { if (vv.offsetTop > 0.5) window.scrollTo(0, 0); requestAnimationFrame(() => { const l = $('#chatlog'); if (l && open) l.scrollTop = l.scrollHeight; }); }
+      return open;
     };
-    vv.addEventListener('resize', upd); vv.addEventListener('scroll', upd);
+    // đổi cỡ (bàn phím mở/đóng): cập nhật khung và cuộn xuống tin mới nhất
+    vv.addEventListener('resize', () => {
+      const open = vars();
+      if (S.chat) requestAnimationFrame(() => { const l = $('#chatlog'); if (l && open) l.scrollTop = l.scrollHeight; });
+    });
+    // dịch chuyển (kéo): chỉ cập nhật vị trí, tuyệt đối không cuộn danh sách để khỏi tranh với ngón tay
+    vv.addEventListener('scroll', () => { vars(); if (S.chat && vv.offsetTop > 0.5) window.scrollTo(0, 0); });
   }
   // ?demo=1 tạo dữ liệu mẫu nếu máy còn trống; ?tab=stats|wallet|settings mở thẳng tab đó
   const qs = new URLSearchParams(location.search);
