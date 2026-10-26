@@ -798,7 +798,7 @@ function dbgEv(k, s) {
 function dbgRender() {
   const p = $('#dbg'), l = $('#chatlog'); if (!p || !l) return;
   const vv = window.visualViewport, a = document.activeElement;
-  p.querySelector('.dbg-s').innerHTML = `v31 · log SH ${l.scrollHeight} CH ${l.clientHeight} ST ${Math.round(l.scrollTop)}<br>vv h ${vv ? Math.round(vv.height) : '-'} top ${vv ? Math.round(vv.offsetTop) : '-'} · scrollY ${Math.round(scrollY)} · innerH ${innerHeight} · tiêu điểm ${a && a !== document.body ? dbgDesc(a) : 'không'}`
+  p.querySelector('.dbg-s').innerHTML = `v32 · log SH ${l.scrollHeight} CH ${l.clientHeight} ST ${Math.round(l.scrollTop)}<br>vv h ${vv ? Math.round(vv.height) : '-'} top ${vv ? Math.round(vv.offsetTop) : '-'} · scrollY ${Math.round(scrollY)} · innerH ${innerHeight} · tiêu điểm ${a && a !== document.body ? dbgDesc(a) : 'không'}`
     + `<div class="dbg-ev">${DBG.ev.map(e => `<div><i>${e.t}${e.c > 1 ? '–' + e.t2 + ' ×' + e.c : ''}</i> ${e.s}</div>`).join('') || 'Chưa có sự kiện.'}</div>`;
 }
 function dbgApply() {
@@ -1364,6 +1364,11 @@ async function init() {
     };
     // đổi cỡ (bàn phím mở/đóng): cập nhật khung; danh sách tự giữ tin ở đáy nhờ ResizeObserver trong openEntry
     vv.addEventListener('resize', vars);
+    // iOS đôi khi không báo đổi cỡ khi bàn phím mở lại: đo lại vài nhịp mỗi khi ô nhập được chọn hoặc bỏ chọn.
+    // Chọn ô nhập là người dùng muốn gõ nên bỏ luôn khoảng chờ của lần cất bàn phím trước
+    const remeasure = () => [60, 250, 500, 900].forEach(ms => setTimeout(vars, ms));
+    document.addEventListener('focusin', e => { if (e.target.id === 'q') { S.kbHold = 0; remeasure(); } });
+    document.addEventListener('focusout', e => { if (e.target.id === 'q') remeasure(); });
     // dịch chuyển (kéo): chỉ cập nhật vị trí, tuyệt đối không cuộn danh sách để khỏi tranh với ngón tay
     vv.addEventListener('scroll', () => { vars(); if (S.chat && vv.offsetTop > 0.5) window.scrollTo(0, 0); });
   }
