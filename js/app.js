@@ -746,6 +746,15 @@ function openEntry() {
     // không tự mở bàn phím: trên iPhone, bàn phím tự bật rồi bị vuốt đóng làm danh sách kẹt cuộn tới khi chạm lại một lần
     const q = $('#q', sh);
     $('.chat-h h2', sh).addEventListener('click', dbgTap);
+    // chạm vào ô nhập: tự chọn ô với preventScroll để iOS không đẩy cả trang lên (đẩy trang làm khung nhảy và giật khi cất bàn phím).
+    // focusin sẽ đặt sẵn khung phía trên bàn phím trước khi bàn phím lên
+    let qy = 0; q.addEventListener('touchstart', e => { qy = e.touches[0].clientY; }, { passive: true });
+    q.addEventListener('touchend', e => {
+      if (document.activeElement === q || Math.abs(e.changedTouches[0].clientY - qy) > 10) return;
+      e.preventDefault(); q.focus({ preventScroll: true });
+      if (q.isContentEditable) { const r = document.createRange(); r.selectNodeContents(q); r.collapse(false); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); }
+      else q.setSelectionRange(q.value.length, q.value.length);
+    }, { passive: false });
     q.addEventListener('input', () => { if (q.isContentEditable) { if (!q.textContent) q.innerHTML = ''; return; } q.style.height = 'auto'; q.style.height = Math.min(110, q.scrollHeight) + 'px'; });
     sh.addEventListener('mousedown', e => { if (e.target.closest('.chat-log button, .chat-in button')) e.preventDefault(); });
     q.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendFromInput(); } });
@@ -806,7 +815,7 @@ function dbgEv(k, s) {
 function dbgRender() {
   const p = $('#dbg'), l = $('#chatlog'); if (!p || !l) return;
   const vv = window.visualViewport, a = document.activeElement;
-  p.querySelector('.dbg-s').innerHTML = `v37 · log SH ${l.scrollHeight} CH ${l.clientHeight} ST ${Math.round(l.scrollTop)}<br>vv h ${vv ? Math.round(vv.height) : '-'} top ${vv ? Math.round(vv.offsetTop) : '-'} · scrollY ${Math.round(scrollY)} · innerH ${innerHeight} · tiêu điểm ${a && a !== document.body ? dbgDesc(a) : 'không'}`
+  p.querySelector('.dbg-s').innerHTML = `v38 · log SH ${l.scrollHeight} CH ${l.clientHeight} ST ${Math.round(l.scrollTop)}<br>vv h ${vv ? Math.round(vv.height) : '-'} top ${vv ? Math.round(vv.offsetTop) : '-'} · scrollY ${Math.round(scrollY)} · innerH ${innerHeight} · tiêu điểm ${a && a !== document.body ? dbgDesc(a) : 'không'}`
     + `<div class="dbg-ev">${DBG.ev.map(e => `<div><i>${e.t}${e.c > 1 ? '–' + e.t2 + ' ×' + e.c : ''}</i> ${e.s}</div>`).join('') || 'Chưa có sự kiện.'}</div>`;
 }
 function dbgApply() {
