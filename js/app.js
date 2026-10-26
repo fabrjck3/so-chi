@@ -751,7 +751,14 @@ function openEntry() {
     let qy = 0; q.addEventListener('touchstart', e => { qy = e.touches[0].clientY; }, { passive: true });
     q.addEventListener('touchend', e => {
       if (document.activeElement === q || Math.abs(e.changedTouches[0].clientY - qy) > 10) return;
-      e.preventDefault(); q.focus({ preventScroll: true });
+      e.preventDefault();
+      // iOS bỏ qua preventScroll và vẫn đẩy trang nếu thấy ô nhập ở thấp. Nên: đặt sẵn khung lên trên bàn phím, và trong lúc chọn ô
+      // thì tạm đưa hàng nhập lên cao (ẩn đi) để iOS thấy ô đã nằm gọn trong vùng nhìn, không đẩy trang. Bàn phím lên xong thì trả hàng nhập về
+      S.kbPrep?.();
+      const row = q.closest('.chat-in'), r = row.getBoundingClientRect();
+      row.style.transition = 'none'; row.style.opacity = '0'; row.style.transform = `translateY(${Math.round(90 - r.top)}px)`;
+      S.rowHide = row; clearTimeout(S.rowT); S.rowT = setTimeout(rowShow, 450);
+      q.focus({ preventScroll: true });
       if (q.isContentEditable) { const r = document.createRange(); r.selectNodeContents(q); r.collapse(false); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); }
       else q.setSelectionRange(q.value.length, q.value.length);
     }, { passive: false });
@@ -815,7 +822,7 @@ function dbgEv(k, s) {
 function dbgRender() {
   const p = $('#dbg'), l = $('#chatlog'); if (!p || !l) return;
   const vv = window.visualViewport, a = document.activeElement;
-  p.querySelector('.dbg-s').innerHTML = `v38 · log SH ${l.scrollHeight} CH ${l.clientHeight} ST ${Math.round(l.scrollTop)}<br>vv h ${vv ? Math.round(vv.height) : '-'} top ${vv ? Math.round(vv.offsetTop) : '-'} · scrollY ${Math.round(scrollY)} · innerH ${innerHeight} · tiêu điểm ${a && a !== document.body ? dbgDesc(a) : 'không'}`
+  p.querySelector('.dbg-s').innerHTML = `v39 · log SH ${l.scrollHeight} CH ${l.clientHeight} ST ${Math.round(l.scrollTop)}<br>vv h ${vv ? Math.round(vv.height) : '-'} top ${vv ? Math.round(vv.offsetTop) : '-'} · scrollY ${Math.round(scrollY)} · innerH ${innerHeight} · tiêu điểm ${a && a !== document.body ? dbgDesc(a) : 'không'}`
     + `<div class="dbg-ev">${DBG.ev.map(e => `<div><i>${e.t}${e.c > 1 ? '–' + e.t2 + ' ×' + e.c : ''}</i> ${e.s}</div>`).join('') || 'Chưa có sự kiện.'}</div>`;
 }
 function dbgApply() {
@@ -867,6 +874,10 @@ function dbgMount(sh) {
     dbgRender();
   });
   dbgEv('o', 'mở khung chat');
+}
+function rowShow() {
+  const row = S.rowHide; if (!row) return; S.rowHide = null;
+  row.style.transform = ''; row.style.transition = 'opacity .18s ease'; row.style.opacity = '';
 }
 function kbClose() {
   const q = $('#q'), app = $('#app'); q?.blur();
@@ -1399,7 +1410,7 @@ async function init() {
     // chọn ô nhập: đặt khung chat ngay vào chỗ phía trên bàn phím (theo chiều cao bàn phím đã đo lần trước) thay vì đợi bàn phím lên xong mới nhảy.
     // Ô nhập đã nằm trên vùng bàn phím nên iOS cũng không phải tự đẩy cả trang lên
     S.kbH = (() => { try { return +localStorage.getItem('kbH') || 0; } catch { return 0; } })() || Math.round(window.innerHeight * 0.435);
-    const kbPre = () => {
+    const kbPre = S.kbPrep = () => {
       if (!S.chat || app.classList.contains('kbopen')) return;
       S.kbPre = Date.now() + 800;
       app.style.setProperty('--kb', S.kbH + 'px'); app.style.setProperty('--vvh', (window.innerHeight - S.kbH) + 'px'); app.style.setProperty('--vvt', '0px');
@@ -1409,7 +1420,8 @@ async function init() {
     document.addEventListener('focusout', e => { if (e.target.id === 'q') remeasure(); });
     // dịch chuyển: chỉ cập nhật vị trí. Không kéo trang về 0 khi iOS tự đẩy trang lên lúc chọn ô nhập:
     // kéo về làm iOS nhớ sai vị trí, tới lúc cất bàn phím cả màn hình giật xuống một cái. Khung chat đã tự bám theo --kb nên không cần
-    vv.addEventListener('scroll', vars);
+    // dự phòng: nếu iOS vẫn đẩy trang thì kéo về 0, vì khi trang bị đẩy, vị trí khung tính theo số iOS báo không khớp màn hình (khung lệch, ô nhập bị che)
+    vv.addEventListener('scroll', () => { vars(); if (S.chat && vv.offsetTop > 0.5) { dbgEv('fix', 'app kéo trang về 0 (lệch ' + Math.round(vv.offsetTop) + ')'); window.scrollTo(0, 0); } });
   }
   // ?demo=1 tạo dữ liệu mẫu nếu máy còn trống; ?tab=stats|wallet|settings mở thẳng tab đó
   const qs = new URLSearchParams(location.search);
