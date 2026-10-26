@@ -806,7 +806,7 @@ function dbgEv(k, s) {
 function dbgRender() {
   const p = $('#dbg'), l = $('#chatlog'); if (!p || !l) return;
   const vv = window.visualViewport, a = document.activeElement;
-  p.querySelector('.dbg-s').innerHTML = `v36 · log SH ${l.scrollHeight} CH ${l.clientHeight} ST ${Math.round(l.scrollTop)}<br>vv h ${vv ? Math.round(vv.height) : '-'} top ${vv ? Math.round(vv.offsetTop) : '-'} · scrollY ${Math.round(scrollY)} · innerH ${innerHeight} · tiêu điểm ${a && a !== document.body ? dbgDesc(a) : 'không'}`
+  p.querySelector('.dbg-s').innerHTML = `v37 · log SH ${l.scrollHeight} CH ${l.clientHeight} ST ${Math.round(l.scrollTop)}<br>vv h ${vv ? Math.round(vv.height) : '-'} top ${vv ? Math.round(vv.offsetTop) : '-'} · scrollY ${Math.round(scrollY)} · innerH ${innerHeight} · tiêu điểm ${a && a !== document.body ? dbgDesc(a) : 'không'}`
     + `<div class="dbg-ev">${DBG.ev.map(e => `<div><i>${e.t}${e.c > 1 ? '–' + e.t2 + ' ×' + e.c : ''}</i> ${e.s}</div>`).join('') || 'Chưa có sự kiện.'}</div>`;
 }
 function dbgApply() {
@@ -1376,6 +1376,8 @@ async function init() {
     const vars = () => {
       const kb = Math.max(0, window.innerHeight - vv.height - vv.offsetTop), open = window.innerHeight - vv.height > 120;
       if (open && S.kbHold > Date.now()) return false;
+      if (!open && S.kbPre > Date.now()) return true; // vừa đặt sẵn khung cho bàn phím sắp lên: chưa bỏ khi iOS chưa kịp báo
+      if (open && vv.offsetTop < 1) { const h = Math.round(window.innerHeight - vv.height); if (h !== S.kbH) { S.kbH = h; try { localStorage.setItem('kbH', h); } catch {} } }
       app.style.setProperty('--kb', kb + 'px'); app.style.setProperty('--vvh', Math.round(vv.height) + 'px'); app.style.setProperty('--vvt', Math.round(vv.offsetTop) + 'px');
       app.classList.toggle('kbopen', open);
       return open;
@@ -1384,8 +1386,17 @@ async function init() {
     vv.addEventListener('resize', vars);
     // iOS đôi khi không báo đổi cỡ khi bàn phím mở lại: đo lại vài nhịp mỗi khi ô nhập được chọn hoặc bỏ chọn.
     // Chọn ô nhập là người dùng muốn gõ nên bỏ luôn khoảng chờ của lần cất bàn phím trước
-    const remeasure = () => [60, 250, 500, 900].forEach(ms => setTimeout(vars, ms));
-    document.addEventListener('focusin', e => { if (e.target.id === 'q') { S.kbHold = 0; remeasure(); } });
+    const remeasure = () => [60, 250, 500, 900, 1200].forEach(ms => setTimeout(vars, ms));
+    // chọn ô nhập: đặt khung chat ngay vào chỗ phía trên bàn phím (theo chiều cao bàn phím đã đo lần trước) thay vì đợi bàn phím lên xong mới nhảy.
+    // Ô nhập đã nằm trên vùng bàn phím nên iOS cũng không phải tự đẩy cả trang lên
+    S.kbH = (() => { try { return +localStorage.getItem('kbH') || 0; } catch { return 0; } })() || Math.round(window.innerHeight * 0.435);
+    const kbPre = () => {
+      if (!S.chat || app.classList.contains('kbopen')) return;
+      S.kbPre = Date.now() + 800;
+      app.style.setProperty('--kb', S.kbH + 'px'); app.style.setProperty('--vvh', (window.innerHeight - S.kbH) + 'px'); app.style.setProperty('--vvt', '0px');
+      app.classList.add('kbopen');
+    };
+    document.addEventListener('focusin', e => { if (e.target.id === 'q') { S.kbHold = 0; kbPre(); remeasure(); } });
     document.addEventListener('focusout', e => { if (e.target.id === 'q') remeasure(); });
     // dịch chuyển: chỉ cập nhật vị trí. Không kéo trang về 0 khi iOS tự đẩy trang lên lúc chọn ô nhập:
     // kéo về làm iOS nhớ sai vị trí, tới lúc cất bàn phím cả màn hình giật xuống một cái. Khung chat đã tự bám theo --kb nên không cần
