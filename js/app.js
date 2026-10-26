@@ -44,6 +44,7 @@ const badge = (name, color, force) => `<span class="ic" style="background:${colo
 const DEF_SET = {
   budget: 6000000, dailyBudget: 0, recurring: [], sync: { url: '', token: '' }, bankBal: null, lastBal: null, seen: [], lastSync: null, categories: DEF_CATS, open: { bank: 0, cash: 0 }, apiKey: '', model: 'claude-haiku-5-5',
   ai: true, autosave: true, altInput: false, usdVnd: 25500, price: { in: 0, out: 0 }, usage: {}, defWallet: 'cash', theme: 'auto', lastBackup: null, learned: {}, welcomed: false,
+  schedCheckDays: 0, schedCheckAt: null,
 };
 
 const S = { lm: 'day', ld: ymd(new Date()), lmk: mkey(new Date()), lcat: '', q: '', tx: [], set: null, queue: [], tab: 'home', month: mkey(new Date()), wf: 'all', busy: false, C: null, pill: {} };
@@ -255,6 +256,9 @@ function renderHome() {
   if (needBackup()) {
     html += `<section class="bx-glass coral" style="padding:14px 16px"><div class="rowf"><div><b>Nhắc sao lưu</b><div class="sm">${S.set.lastBackup ? 'Đã ' + Math.floor((Date.now() - S.set.lastBackup) / 864e5) + ' ngày chưa sao lưu.' : 'Bạn chưa sao lưu lần nào.'} Dữ liệu chỉ nằm trên máy này.</div></div><button class="btn sm2" data-act="export-json">Sao lưu</button></div></section>`;
   }
+  if (needSchedCheck()) {
+    html += `<section class="bx-glass amber" style="padding:14px 16px"><div class="rowf"><div><b>Kiểm tra lịch chuyển tiền</b><div class="sm">Đã ${Math.floor((Date.now() - S.set.schedCheckAt) / 864e5)} ngày. Mở app ngân hàng (VietinBank iPay: Chuyển tiền → Đặt lịch chuyển tiền), xem lệnh còn chạy và đúng số tiền.</div></div><button class="btn sm2" data-act="schedok" style="white-space:nowrap">Còn chạy</button></div></section>`;
+  }
   const recent = S.tx.filter(t => t.date <= todayS).slice(0, 8);
   html += `<section class="bx-glass bx-list indigo"><div class="bx-lh"><span class="bx-eye"><span class="bx-dot"></span>Gần đây</span><button class="link" data-act="tab" data-tab="log">Xem sổ</button></div>${recent.length ? recent.map(t => txRow(t)).join('') : '<div class="empty">Chưa có khoản nào. Nhấn + để thêm.</div>'}</section></div>`;
   el.home.innerHTML = html;
@@ -263,6 +267,8 @@ function needBackup() {
   if (S.tx.length < 5 || S.tx.every(t => t.sample)) return false;
   return !S.set.lastBackup || Date.now() - S.set.lastBackup > 7 * 864e5;
 }
+// Nhắc tự mở app ngân hàng xem lệnh chuyển tiền theo lịch còn chạy không (app không đọc được lệnh đó).
+const needSchedCheck = () => S.set.schedCheckDays > 0 && Date.now() - (S.set.schedCheckAt || 0) > S.set.schedCheckDays * 864e5;
 
 /* ---------- Chi tiêu định kỳ ---------- */
 const lastDom = (y, m) => new Date(y, m + 1, 0).getDate();
@@ -303,7 +309,8 @@ function recurCard() {
     <div class="card"><div class="tri" style="margin:0"><div><span>Cố định mỗi tháng</span><b>${fmtS(fixedM)}</b></div><div><span>Chiếm ngân sách</span><b>${S.set.budget ? Math.round(fixedM / S.set.budget * 100) : 0}%</b></div><div><span>Còn để tiêu</span><b class="${free < 0 ? 'bad' : ''}">${fmtS(free)}</b><span>≈ ${fmtS(free / dim)}/ngày</span></div></div>
       ${incM ? `<div class="sm" style="margin-top:8px">Thu định kỳ mỗi tháng khoảng ${fmtS(incM)}.</div>` : ''}</div>
     <div class="group" style="margin-top:12px">${rules.map(r => `<button class="li" data-act="redit" data-id="${r.id}" style="${r.active ? '' : 'opacity:.5'}">${badge(r.category, r.type === 'thu' ? 'var(--c5)' : catColor(r.category), r.type === 'thu' ? 'in' : null)}<div class="n"><b>${esc(r.name)}</b><span>${schedule(r)} · ${W[r.wallet]}${r.active ? '' : ' · tạm dừng'}</span></div><div class="a ${r.type === 'thu' ? 'in' : ''}">${r.type === 'thu' ? '+' : '−'}${fmt(r.amount)}</div></button>`).join('')}
-      <button class="srow act" data-act="radd">Thêm khoản định kỳ<span class="chev">+</span></button></div>
+      <button class="srow act" data-act="radd">Thêm khoản định kỳ<span class="chev">+</span></button>
+      <label class="srow"><span>Nhắc kiểm tra lịch chuyển tiền ở ngân hàng</span><select id="s-sched" data-set="schedCheckDays">${[[0, 'Tắt'], [14, '2 tuần'], [30, 'Hằng tháng'], [90, '3 tháng']].map(([v, l]) => `<option value="${v}" ${v === S.set.schedCheckDays ? 'selected' : ''}>${l}</option>`).join('')}</select></label></div>
     <div class="foot">Khoản lặp lại hàng tháng hay hàng tuần tự ghi khi đến ngày. Phần chưa đến hạn được trừ khỏi ngân sách ngày để bạn biết mình thật sự tiêu được bao nhiêu.</div></div>`;
 }
 async function runRecurring() {
@@ -1328,6 +1335,7 @@ const ACT = {
   unsample: async () => { const ids = S.tx.filter(t => t.sample).map(t => t.id); await DB.delMany('tx', ids); const qids = S.queue.filter(q => q.sample).map(q => q.id); if (qids.length) { await DB.delMany('queue', qids); S.queue = S.queue.filter(q => !q.sample); } S.set.recurring = S.set.recurring.filter(r => !r.sample); await saveSet(); await load(); renderAll(); toast(`Đã xoá ${ids.length} khoản mẫu`); },
   wipe: () => dialog('Xoá toàn bộ giao dịch?', 'Hành động này không hoàn tác được. Nên xuất JSON để sao lưu trước.', 'Xoá hết', async () => { await DB.clear('tx'); await DB.clear('queue'); await load(); closeSheet(); renderAll(); toast('Đã xoá'); }, true),
   'dlg-ok': () => S.dlg?.(),
+  schedok: async () => { S.set.schedCheckAt = Date.now(); await saveSet(); renderHome(); toast('Đã ghi nhận, sẽ nhắc lại sau'); },
   'export-json': () => doExport('json'),
   'export-csv': () => doExport('csv'),
   import: () => { el.file.value = ''; el.file.click(); },
@@ -1371,7 +1379,9 @@ document.addEventListener('change', async e => {
     if (num) { v = amountFromText(v) || 0; t.value = fmtNum(v); }
     if (k.startsWith('price.')) S.set.price[k.slice(6)] = parseFloat(String(v).replace(',', '.')) || 0;
     else if (k.startsWith('sync.')) S.set.sync[k.slice(5)] = String(v).trim();
-    else if (k.startsWith('open.')) S.set.open[k.slice(5)] = v; else S.set[k] = typeof v === 'string' ? v.trim() : v;
+    else if (k.startsWith('open.')) S.set.open[k.slice(5)] = v;
+    else if (k === 'schedCheckDays') { S.set.schedCheckDays = +v || 0; S.set.schedCheckAt = Date.now(); }
+    else S.set[k] = typeof v === 'string' ? v.trim() : v;
     await saveSet();
     if (k === 'theme') applyTheme();
     if (k === 'ai' || k === 'apiKey') processQueue();
