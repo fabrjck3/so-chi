@@ -834,7 +834,7 @@ function dbgEv(k, s) {
 function dbgRender() {
   const p = $('#dbg'), l = $('#chatlog'); if (!p || !l) return;
   const vv = window.visualViewport, a = document.activeElement;
-  p.querySelector('.dbg-s').innerHTML = `v41 · log SH ${l.scrollHeight} CH ${l.clientHeight} ST ${Math.round(l.scrollTop)}<br>vv h ${vv ? Math.round(vv.height) : '-'} top ${vv ? Math.round(vv.offsetTop) : '-'} · scrollY ${Math.round(scrollY)} · innerH ${innerHeight} · tiêu điểm ${a && a !== document.body ? dbgDesc(a) : 'không'}`
+  p.querySelector('.dbg-s').innerHTML = `v42 · log SH ${l.scrollHeight} CH ${l.clientHeight} ST ${Math.round(l.scrollTop)}<br>vv h ${vv ? Math.round(vv.height) : '-'} top ${vv ? Math.round(vv.offsetTop) : '-'} · scrollY ${Math.round(scrollY)} · innerH ${innerHeight} · tiêu điểm ${a && a !== document.body ? dbgDesc(a) : 'không'}`
     + `<div class="dbg-ev">${DBG.ev.map(e => `<div><i>${e.t}${e.c > 1 ? '–' + e.t2 + ' ×' + e.c : ''}</i> ${e.s}</div>`).join('') || 'Chưa có sự kiện.'}</div>`;
 }
 function dbgApply() {
@@ -878,7 +878,7 @@ function dbgMount(sh) {
     if (k === 'off') { DBG.on = false; try { localStorage.setItem('dbgScroll', '0'); } catch {} p.remove(); return; }
     if (k === 'clr') { DBG.ev = []; DBG.tr = []; }
     else if (k === 'copy') {
-      const txt = 'SoChi v41 ' + (navigator.userAgent.match(/OS [\d_]+/) || [''])[0] + ' innerH ' + innerHeight + '\n' + (DBG.tr || []).map(t => t.kind + ' ' + t.f.join(' ')).join('\n');
+      const txt = 'SoChi v42 ' + (navigator.userAgent.match(/OS [\d_]+/) || [''])[0] + ' innerH ' + innerHeight + '\n' + (DBG.tr || []).map(t => t.kind + ' ' + t.f.join(' ')).join('\n');
       const done = ok => { b.textContent = ok ? 'Đã chép ✓' : 'Không chép được'; setTimeout(() => { b.textContent = 'Chép số đo'; }, 1500); };
       navigator.clipboard?.writeText(txt).then(() => done(true), () => done(false)) ?? done(false);
       return;
@@ -1432,7 +1432,7 @@ async function init() {
       if (!S.chat || app.classList.contains('kbopen')) return;
       S.kbPre = Date.now() + 800;
       // kbanim: khung trượt lên cùng nhịp bàn phím (bàn phím iOS lên mất khoảng 0,35 giây), xong thì bỏ để các lần đo sau bám tức thì
-      app.classList.add('kbanim'); clearTimeout(S.kbAnimT); S.kbAnimT = setTimeout(() => app.classList.remove('kbanim'), 500);
+      app.classList.add('kbanim'); clearTimeout(S.kbAnimT); S.kbAnimT = setTimeout(() => app.classList.remove('kbanim'), 650);
       app.style.setProperty('--kb', S.kbH + 'px'); app.style.setProperty('--vvh', (window.innerHeight - S.kbH) + 'px'); app.style.setProperty('--vvt', '0px');
       app.classList.add('kbopen');
     };
