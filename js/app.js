@@ -801,7 +801,7 @@ function dbgEv(k, s) {
 function dbgRender() {
   const p = $('#dbg'), l = $('#chatlog'); if (!p || !l) return;
   const vv = window.visualViewport, a = document.activeElement;
-  p.querySelector('.dbg-s').innerHTML = `v34 · log SH ${l.scrollHeight} CH ${l.clientHeight} ST ${Math.round(l.scrollTop)}<br>vv h ${vv ? Math.round(vv.height) : '-'} top ${vv ? Math.round(vv.offsetTop) : '-'} · scrollY ${Math.round(scrollY)} · innerH ${innerHeight} · tiêu điểm ${a && a !== document.body ? dbgDesc(a) : 'không'}`
+  p.querySelector('.dbg-s').innerHTML = `v35 · log SH ${l.scrollHeight} CH ${l.clientHeight} ST ${Math.round(l.scrollTop)}<br>vv h ${vv ? Math.round(vv.height) : '-'} top ${vv ? Math.round(vv.offsetTop) : '-'} · scrollY ${Math.round(scrollY)} · innerH ${innerHeight} · tiêu điểm ${a && a !== document.body ? dbgDesc(a) : 'không'}`
     + `<div class="dbg-ev">${DBG.ev.map(e => `<div><i>${e.t}${e.c > 1 ? '–' + e.t2 + ' ×' + e.c : ''}</i> ${e.s}</div>`).join('') || 'Chưa có sự kiện.'}</div>`;
 }
 function dbgApply() {
@@ -1382,8 +1382,9 @@ async function init() {
     const remeasure = () => [60, 250, 500, 900].forEach(ms => setTimeout(vars, ms));
     document.addEventListener('focusin', e => { if (e.target.id === 'q') { S.kbHold = 0; remeasure(); } });
     document.addEventListener('focusout', e => { if (e.target.id === 'q') remeasure(); });
-    // dịch chuyển (kéo): chỉ cập nhật vị trí, tuyệt đối không cuộn danh sách để khỏi tranh với ngón tay
-    vv.addEventListener('scroll', () => { vars(); if (S.chat && vv.offsetTop > 0.5) { dbgEv('fix', 'app kéo trang về 0 (lệch ' + Math.round(vv.offsetTop) + ')'); window.scrollTo(0, 0); } });
+    // dịch chuyển: chỉ cập nhật vị trí. Không kéo trang về 0 khi iOS tự đẩy trang lên lúc chọn ô nhập:
+    // kéo về làm iOS nhớ sai vị trí, tới lúc cất bàn phím cả màn hình giật xuống một cái. Khung chat đã tự bám theo --kb nên không cần
+    vv.addEventListener('scroll', vars);
   }
   // ?demo=1 tạo dữ liệu mẫu nếu máy còn trống; ?tab=stats|wallet|settings mở thẳng tab đó
   const qs = new URLSearchParams(location.search);
