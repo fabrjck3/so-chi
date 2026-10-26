@@ -928,3 +928,7 @@ button,[data-act],input,textarea,select{touch-action:manipulation}
 #app.kbopen .sheet.chat .chat-h,#app.kbopen .sheet.chat .grab{display:none}
 #app.kbopen .sheet.chat{padding-top:10px}
 #app.kbopen .sheet.chat .chat-log{padding-top:2px}
+
+/* không để top/height bị trễ khi vùng nhìn đang dịch chuyển */
+#app.kbopen .sheet.chat{transition:transform .5s cubic-bezier(.22,1,.36,1),opacity .22s ease}
+.scrim{touch-action:none}

@@ -589,13 +589,13 @@ function renderAllExceptSettings() { S.dirty = new Set(['home', 'log', 'stats', 
 
 /* ---------- sheet ---------- */
 function openSheet(html, mount, cls = '') {
-  S.chat = cls === 'chat';
+  S.chat = cls === 'chat'; if (!S.chat) chatTouchLock(false);
   el.sheet.innerHTML = '<div class="grab"></div>' + html;
   el.sheet.className = 'sheet on' + (cls ? ' ' + cls : ''); el.scrim.classList.add('on'); el.sheet.scrollTop = 0; $('#app').classList.add('sheetopen'); $('main').inert = true; $('.dock').inert = true;
   mount?.(el.sheet);
 }
 function closeSheet() {
-  el.sheet.classList.remove('on'); el.scrim.classList.remove('on'); S.C = null; S.chat = false; $('#app').classList.remove('sheetopen'); $('main').inert = false; $('.dock').inert = false;
+  el.sheet.classList.remove('on'); el.scrim.classList.remove('on'); S.C = null; S.chat = false; chatTouchLock(false); $('#app').classList.remove('sheetopen'); $('main').inert = false; $('.dock').inert = false;
   if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur();
 }
 let toastT;
@@ -728,21 +728,31 @@ function openEntry() {
       ${S.set.altInput ? '<div class="inp ce" id="q" contenteditable="plaintext-only" role="textbox" enterkeyhint="send" autocapitalize="sentences" data-ph="Gõ một câu, ví dụ 45k phở" aria-label="Câu nhập"></div>' : '<textarea class="inp" id="q" rows="1" enterkeyhint="send" autocomplete="off" placeholder="Gõ một câu, ví dụ 45k phở" aria-label="Câu nhập"></textarea>'}
       <button class="send" data-act="send" aria-label="Gửi"><svg viewBox="0 0 24 24"><path d="M12 19V5M6 11l6-6 6 6"/></svg></button></div>`, sh => {
     const log = $('#chatlog', sh); log.scrollTop = log.scrollHeight;
-    // chỉ danh sách tin nhắn được cuộn; kéo ở chỗ khác hoặc kéo quá đầu/cuối không làm cả khung trôi theo
-    let y0 = 0;
-    sh.addEventListener('touchstart', e => { y0 = e.touches[0].clientY; }, { passive: true });
-    sh.addEventListener('touchmove', e => {
-      const inLog = e.target.closest && e.target.closest('.chat-log');
-      if (!inLog) { if (!e.target.closest('textarea')) e.preventDefault(); return; }
-      const dy = e.touches[0].clientY - y0, atTop = log.scrollTop <= 0, atBottom = log.scrollTop + log.clientHeight >= log.scrollHeight - 1;
-      if (log.scrollHeight <= log.clientHeight + 1 || (atTop && dy > 0) || (atBottom && dy < 0)) e.preventDefault();
-    }, { passive: false });
+    chatTouchLock(true);
     const q = $('#q', sh); q.focus({ preventScroll: true });
     q.addEventListener('focus', () => setTimeout(() => { const l = $('#chatlog'); if (l) l.scrollTop = l.scrollHeight; }, 320));
     q.addEventListener('input', () => { if (q.isContentEditable) { if (!q.textContent) q.innerHTML = ''; return; } q.style.height = 'auto'; q.style.height = Math.min(110, q.scrollHeight) + 'px'; });
     sh.addEventListener('mousedown', e => { if (e.target.closest('.chat-log button, .chat-in button')) e.preventDefault(); });
     q.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendFromInput(); } });
   }, 'chat');
+}
+/* khi khung chat mở: chỉ danh sách tin nhắn được cuộn. Mọi cú kéo khác (kể cả ngoài khung) bị chặn để iOS không kéo trôi cả vùng nhìn */
+function chatTouchLock(on) {
+  if (on === !!S.lock) return; S.lock = on;
+  if (on) {
+    S.ts = e => { S.y0 = e.touches[0].clientY; };
+    S.tm = e => {
+      const t = e.target, l = $('#chatlog');
+      if (t.closest && t.closest('textarea') && t.scrollHeight > t.clientHeight + 1) return;
+      if (!l || !(t.closest && t.closest('.chat-log'))) { e.preventDefault(); return; }
+      const dy = e.touches[0].clientY - S.y0, atTop = l.scrollTop <= 0, atBottom = l.scrollTop + l.clientHeight >= l.scrollHeight - 1;
+      if (l.scrollHeight <= l.clientHeight + 1 || (atTop && dy > 0) || (atBottom && dy < 0)) e.preventDefault();
+    };
+    document.addEventListener('touchstart', S.ts, { passive: true });
+    document.addEventListener('touchmove', S.tm, { passive: false });
+  } else {
+    document.removeEventListener('touchstart', S.ts); document.removeEventListener('touchmove', S.tm);
+  }
 }
 function sendFromInput() {
   const q = $('#q'); if (!q) return;
@@ -1258,7 +1268,7 @@ async function init() {
       const kb = Math.max(0, window.innerHeight - vv.height - vv.offsetTop), open = window.innerHeight - vv.height > 120;
       app.style.setProperty('--kb', kb + 'px'); app.style.setProperty('--vvh', Math.round(vv.height) + 'px'); app.style.setProperty('--vvt', Math.round(vv.offsetTop) + 'px');
       app.classList.toggle('kbopen', open);
-      if (S.chat) requestAnimationFrame(() => { const l = $('#chatlog'); if (l) l.scrollTop = l.scrollHeight; });
+      if (S.chat) { if (vv.offsetTop > 0.5) window.scrollTo(0, 0); requestAnimationFrame(() => { const l = $('#chatlog'); if (l && open) l.scrollTop = l.scrollHeight; }); }
     };
     vv.addEventListener('resize', upd); vv.addEventListener('scroll', upd);
   }
