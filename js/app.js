@@ -723,14 +723,14 @@ function refreshChat() {
 }
 function openEntry() {
   openSheet(`<div class="chat-h"><h2>Nhập chi tiêu</h2><div class="chat-tools"><button class="link" data-act="kp">Bàn phím số</button><button class="link" data-act="manual">Nhập tay</button></div></div>
-    ${DBG.on ? '<div class="dbg" id="dbg"><div class="dbg-s"></div><div class="dbg-b">' + [['nolock', 'Khoá chạm'], ['pan', 'pan-y'], ['mt', 'Neo đáy'], ['ovf', 'Sheet hidden'], ['scrim', 'Nền mờ chặn chạm'], ['glass', 'Kính'], ['wc', 'will-change']].map(([k, t]) => `<button type="button" data-dbg="${k}" data-t="${t}"></button>`).join('') + '<button type="button" data-dbg="fake">+15 tin thử</button><button type="button" data-dbg="re">Làm mới lớp cuộn</button><button type="button" data-dbg="off">Ẩn bảng</button></div></div>' : ''}
+    ${DBG.on ? '<div class="dbg" id="dbg"><div class="dbg-b"><button type="button" data-dbg="nofocus"></button><button type="button" data-dbg="fake">+15 tin thử</button><button type="button" data-dbg="clr">Xoá nhật ký</button><button type="button" data-dbg="off">Ẩn bảng</button></div><div class="dbg-s"></div></div>' : ''}
     <div class="chat-log" id="chatlog">${chatLogHTML()}</div>
     <div class="chat-in"><button class="clip" data-act="paste" aria-label="Dán tin nhắn ngân hàng"><svg viewBox="0 0 24 24"><path d="M9 4h6v3H9zM7 6H6a1 1 0 0 0-1 1v13a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V7a1 1 0 0 0-1-1h-1"/></svg></button>
       ${S.set.altInput ? '<div class="inp ce" id="q" contenteditable="plaintext-only" role="textbox" enterkeyhint="send" autocapitalize="sentences" data-ph="Gõ một câu, ví dụ 45k phở" aria-label="Câu nhập"></div>' : '<textarea class="inp" id="q" rows="1" enterkeyhint="send" autocomplete="off" placeholder="Gõ một câu, ví dụ 45k phở" aria-label="Câu nhập"></textarea>'}
       <button class="send" data-act="send" aria-label="Gửi"><svg viewBox="0 0 24 24"><path d="M12 19V5M6 11l6-6 6 6"/></svg></button></div>`, sh => {
     const log = $('#chatlog', sh); log.scrollTop = log.scrollHeight;
     chatTouchLock(true); dbgMount(sh);
-    const q = $('#q', sh); q.focus({ preventScroll: true });
+    const q = $('#q', sh); if (!DBG.nofocus) q.focus({ preventScroll: true });
     q.addEventListener('focus', () => setTimeout(() => { const l = $('#chatlog'); if (l) l.scrollTop = l.scrollHeight; }, 320));
     q.addEventListener('input', () => { if (q.isContentEditable) { if (!q.textContent) q.innerHTML = ''; return; } q.style.height = 'auto'; q.style.height = Math.min(110, q.scrollHeight) + 'px'; });
     sh.addEventListener('mousedown', e => { if (e.target.closest('.chat-log button, .chat-in button')) e.preventDefault(); });
@@ -751,7 +751,7 @@ function chatTouchLock(on) {
         const atTop = l.scrollTop <= 0, atBottom = l.scrollTop + l.clientHeight >= l.scrollHeight - 1;
         why = l.scrollHeight <= l.clientHeight + 1 ? 'không tràn' : atTop && dy > 0 ? 'ở đỉnh' : atBottom && dy < 0 ? 'ở đáy' : '';
       }
-      const g = DBG.g; if (g) { if (!g.mv) g.first = why ? 'CHẶN (' + why + ')' : 'cho'; g.mv++; g.dy = Math.round(dy); if (why) g.pv++; dbgRender(); }
+      const g = DBG.g; if (g) { if (!g.mv) g.first = why ? 'CHẶN (' + why + ')' : 'cho'; g.mv++; if (why) g.pv++; }
       if (why && !DBG.nolock) e.preventDefault();
     };
     document.addEventListener('touchstart', S.ts, { passive: true });
@@ -761,7 +761,7 @@ function chatTouchLock(on) {
   }
 }
 /* chẩn đoán cuộn (tạm thời): đo ngay trên iPhone xem cú kéo bị ai chặn, rồi bật tắt từng nghi phạm để thử */
-const DBG = { on: (() => { try { return localStorage.getItem('dbgScroll') !== '0'; } catch { return true; } })(), nolock: false, pan: true, mt: true, ovf: true, scrim: true, glass: true, wc: true, n: 0, g: null, hist: [] };
+const DBG = { on: (() => { try { return localStorage.getItem('dbgScroll') !== '0'; } catch { return true; } })(), nolock: false, pan: true, mt: true, ovf: true, scrim: true, glass: true, wc: true, g: null, ev: [], nofocus: (() => { try { return localStorage.getItem('dbgNoFocus') === '1'; } catch { return false; } })() };
 function dbgDesc(n) {
   if (!n) return '∅';
   if (n.nodeType !== 1) return '#' + n.nodeName.toLowerCase();
@@ -770,21 +770,24 @@ function dbgDesc(n) {
 }
 function dbgStart(e) {
   if (!DBG.on) return;
-  const t = e.touches[0], l = $('#chatlog');
-  DBG.g = { n: ++DBG.n, tgt: dbgDesc(e.target), hit: dbgDesc(document.elementFromPoint(t.clientX, t.clientY)), inLog: !!(e.target.closest && e.target.closest('.chat-log')), mv: 0, pv: 0, first: '', dy: 0, ls: 0, ds: 0, st0: l ? Math.round(l.scrollTop) : 0 };
-  DBG.hist.unshift(DBG.g); DBG.hist.length = Math.min(DBG.hist.length, 3); dbgRender();
+  const l = $('#chatlog');
+  DBG.g = { tgt: dbgDesc(e.target), mv: 0, pv: 0, first: '', ls: 0, st0: l ? Math.round(l.scrollTop) : 0 };
+  dbgEv('t', 'chạm ' + DBG.g.tgt);
+}
+/* nhật ký sự kiện theo thời gian: bàn phím, tiêu điểm, chạm, nhấc tay, iOS huỷ cử chỉ, luồng chính bị kẹt */
+function dbgEv(k, s) {
+  if (!DBG.on) return;
+  const t = ((performance.now() - (DBG.t0 || 0)) / 1000).toFixed(1), last = DBG.ev[DBG.ev.length - 1];
+  if (last && last.k === k && (k === 'vv' || k === 'ws')) { last.s = s; last.c++; last.t2 = t; }
+  else { DBG.ev.push({ k, s, t, c: 1 }); if (DBG.ev.length > 11) DBG.ev.shift(); }
+  dbgRender();
 }
 function dbgRender() {
-  if (DBG.raf) return;
-  DBG.raf = requestAnimationFrame(() => {
-    DBG.raf = 0; const p = $('#dbg'), l = $('#chatlog'); if (!p || !l) return;
-    const se = document.scrollingElement, cs = getComputedStyle(l), st = getComputedStyle(el.sheet), on = v => v ? 'bật' : 'tắt';
-    const rows = DBG.hist.map(g => `<div>#${g.n} chạm <b>${g.tgt}</b>${g.hit !== g.tgt ? ' · điểm ' + g.hit : ''} · trong log ${g.inLog ? 'có' : '<b>KHÔNG</b>'}<br>&nbsp; kéo ${g.mv} lần · dy ${g.dy > 0 ? '+' : ''}${g.dy} · lần đầu <b>${g.first || '-'}</b> · chặn ${g.pv} · log cuộn ${g.ls} (ST ${g.st0}→${Math.round(l.scrollTop)}) · trang cuộn ${g.ds}</div>`).join('');
-    p.querySelector('.dbg-s').innerHTML = `v28 · log SH ${l.scrollHeight} CH ${l.clientHeight} ST ${Math.round(l.scrollTop)} · ov ${cs.overflowY} · ta ${cs.touchAction} · sheet ov ${st.overflowY}<br>kb ${getComputedStyle($('#app')).getPropertyValue('--kb').trim() || 0} · trang ST ${se ? Math.round(se.scrollTop) : 0} · innerH ${innerHeight}${rows || '<div>Kéo thử trong danh sách tin nhắn.</div>'}`;
-    // cập nhật nút tại chỗ, không thay phần tử: iOS huỷ cú bấm nếu nút bị thay giữa lúc chạm và lúc nhấc tay
-    const st8 = { nolock: !DBG.nolock, pan: DBG.pan, mt: DBG.mt, ovf: DBG.ovf, scrim: DBG.scrim, glass: DBG.glass, wc: DBG.wc };
-    p.querySelectorAll('.dbg-b [data-t]').forEach(b => { const v = st8[b.dataset.dbg]; b.classList.toggle('on', v); b.textContent = b.dataset.t + ': ' + on(v); });
-  });
+  const p = $('#dbg'), l = $('#chatlog'); if (!p || !l) return;
+  const vv = window.visualViewport, a = document.activeElement;
+  p.querySelector('.dbg-s').innerHTML = `v29 · log SH ${l.scrollHeight} CH ${l.clientHeight} ST ${Math.round(l.scrollTop)}<br>vv h ${vv ? Math.round(vv.height) : '-'} top ${vv ? Math.round(vv.offsetTop) : '-'} · scrollY ${Math.round(scrollY)} · innerH ${innerHeight} · tiêu điểm ${a && a !== document.body ? dbgDesc(a) : 'không'}`
+    + `<div class="dbg-ev">${DBG.ev.map(e => `<div><i>${e.t}${e.c > 1 ? '–' + e.t2 + ' ×' + e.c : ''}</i> ${e.s}</div>`).join('') || 'Chưa có sự kiện.'}</div>`;
+  const nf = p.querySelector('[data-dbg=nofocus]'); if (nf) { nf.classList.toggle('on', !DBG.nofocus); nf.textContent = 'Tự mở bàn phím: ' + (DBG.nofocus ? 'tắt' : 'bật'); }
 }
 function dbgApply() {
   const l = $('#chatlog'); if (!l) return;
@@ -798,27 +801,34 @@ function dbgApply() {
 function dbgReset() { const ss = el.sheet.style; ss.overflow = ss.backdropFilter = ss.webkitBackdropFilter = ss.willChange = ''; el.scrim.style.touchAction = ''; }
 function dbgMount(sh) {
   const p = $('#dbg', sh), l = $('#chatlog', sh); if (!p) return;
-  dbgApply();
-  l.addEventListener('scroll', () => { if (DBG.g) DBG.g.ls++; dbgRender(); }, { passive: true });
+  DBG.t0 = performance.now(); DBG.ev = []; dbgApply();
+  l.addEventListener('scroll', () => { if (DBG.g) DBG.g.ls++; }, { passive: true });
   if (!DBG.wired) {
-    DBG.wired = true;
-    addEventListener('scroll', () => { if (S.chat && DBG.g) { DBG.g.ds++; dbgRender(); } }, { passive: true });
-    document.addEventListener('touchend', () => { if (S.chat) dbgRender(); }, { passive: true });
+    DBG.wired = true; const vv = window.visualViewport;
+    addEventListener('scroll', () => { if (S.chat) dbgEv('ws', 'trang cuộn y ' + Math.round(scrollY)); }, { passive: true });
+    document.addEventListener('touchend', () => { const g = DBG.g; if (S.chat && g) dbgEv('e', `nhấc · kéo ${g.mv} · đầu ${g.first || '-'} · chặn ${g.pv} · log cuộn ${g.ls} (${g.st0}→${Math.round(($('#chatlog') || {}).scrollTop || 0)})`); }, { passive: true });
+    document.addEventListener('touchcancel', () => { if (S.chat) dbgEv('c', '<b>iOS HUỶ cú chạm</b>'); }, { passive: true });
+    document.addEventListener('focusin', e => { if (S.chat) dbgEv('f', 'focus ' + dbgDesc(e.target)); });
+    document.addEventListener('focusout', e => { if (S.chat) dbgEv('f', 'blur ' + dbgDesc(e.target)); });
+    if (vv) { const f = () => { if (S.chat) dbgEv('vv', `vv h ${Math.round(vv.height)} top ${Math.round(vv.offsetTop)}`); }; vv.addEventListener('resize', f); vv.addEventListener('scroll', f); }
+    // nhịp 200ms: nếu hai nhịp cách nhau quá xa nghĩa là luồng chính của trang bị kẹt
+    let last = performance.now();
+    setInterval(() => { const now = performance.now(), gap = now - last; last = now; if (S.chat && $('#dbg') && gap > 600) dbgEv('lag', `<b>trang đứng ${Math.round(gap)}ms</b>`); }, 200);
   }
   p.addEventListener('click', e => {
     const b = e.target.closest('[data-dbg]'); if (!b) return; const k = b.dataset.dbg;
     if (k === 'off') { DBG.on = false; try { localStorage.setItem('dbgScroll', '0'); } catch {} p.remove(); return; }
-    if (k === 're') { const lg = $('#chatlog'); lg.style.overflowY = 'hidden'; void lg.offsetHeight; lg.style.overflowY = ''; }
+    if (k === 'nofocus') { DBG.nofocus = !DBG.nofocus; try { localStorage.setItem('dbgNoFocus', DBG.nofocus ? '1' : '0'); } catch {} }
+    else if (k === 'clr') DBG.ev = [];
     else if (k === 'fake') {
       // tin giả chỉ để có chỗ kéo thử: chỉ nằm trên màn hình, không lưu, đóng khung là mất
       const lg = $('#chatlog'), f = document.createElement('div'); f.className = 'cb-fake';
       f.innerHTML = Array.from({ length: 15 }, (_, i) => `<div class="cb-me">Tin thử ${i + 1}: ${20 + i * 5}k cơm trưa<span class="cb-time">thử</span></div><div class="cb-ai"><b>Tin thử, không lưu</b>Ăn uống · ${20 + i * 5}.000₫</div>`).join('');
       lg.querySelector('.cb-empty')?.remove(); lg.prepend(f); lg.scrollTop = lg.scrollHeight;
     }
-    else DBG[k] = !DBG[k];
-    dbgApply(); dbgRender();
+    dbgRender();
   });
-  dbgRender();
+  dbgEv('o', 'mở khung chat');
 }
 function sendFromInput() {
   const q = $('#q'); if (!q) return;
