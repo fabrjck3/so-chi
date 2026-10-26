@@ -595,7 +595,7 @@ function openSheet(html, mount, cls = '') {
   mount?.(el.sheet);
 }
 function closeSheet() {
-  el.sheet.classList.remove('on'); el.scrim.classList.remove('on'); S.C = null; S.chat = false; chatTouchLock(false); $('#app').classList.remove('sheetopen'); $('main').inert = false; $('.dock').inert = false;
+  el.sheet.classList.remove('on'); el.scrim.classList.remove('on'); S.C = null; S.chat = false; chatTouchLock(false); S.ro?.disconnect(); S.ro = null; $('#app').classList.remove('sheetopen'); $('main').inert = false; $('.dock').inert = false;
   if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur();
 }
 let toastT;
@@ -729,11 +729,15 @@ function openEntry() {
       ${S.set.altInput ? '<div class="inp ce" id="q" contenteditable="plaintext-only" role="textbox" enterkeyhint="send" autocapitalize="sentences" data-ph="Gõ một câu, ví dụ 45k phở" aria-label="Câu nhập"></div>' : '<textarea class="inp" id="q" rows="1" enterkeyhint="send" autocomplete="off" placeholder="Gõ một câu, ví dụ 45k phở" aria-label="Câu nhập"></textarea>'}
       <button class="send" data-act="send" aria-label="Gửi"><svg viewBox="0 0 24 24"><path d="M12 19V5M6 11l6-6 6 6"/></svg></button></div>`, sh => {
     const log = $('#chatlog', sh); log.scrollTop = log.scrollHeight;
+    // khung co giãn (bàn phím mở/đóng): giữ nguyên tin ở đáy, nội dung được đẩy lên hoặc hạ xuống theo khung
+    // (nhớ khoảng cách tới đáy rồi đặt lại, không cộng trừ độ lệch vì trình duyệt có thể đã tự kẹp vị trí cuộn)
+    let fb = 0, own = false;
+    log.addEventListener('scroll', () => { if (own) { own = false; return; } fb = log.scrollHeight - log.scrollTop - log.clientHeight; }, { passive: true });
+    S.ro?.disconnect(); S.ro = new ResizeObserver(() => { const t = log.scrollHeight - log.clientHeight - fb; if (Math.abs(t - log.scrollTop) >= 1) { own = true; log.scrollTop = t; } }); S.ro.observe(log);
     chatTouchLock(true); dbgMount(sh);
     // không tự mở bàn phím: trên iPhone, bàn phím tự bật rồi bị vuốt đóng làm danh sách kẹt cuộn tới khi chạm lại một lần
     const q = $('#q', sh);
     $('.chat-h h2', sh).addEventListener('click', dbgTap);
-    q.addEventListener('focus', () => setTimeout(() => { const l = $('#chatlog'); if (l) l.scrollTop = l.scrollHeight; }, 320));
     q.addEventListener('input', () => { if (q.isContentEditable) { if (!q.textContent) q.innerHTML = ''; return; } q.style.height = 'auto'; q.style.height = Math.min(110, q.scrollHeight) + 'px'; });
     sh.addEventListener('mousedown', e => { if (e.target.closest('.chat-log button, .chat-in button')) e.preventDefault(); });
     q.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendFromInput(); } });
@@ -743,9 +747,10 @@ function openEntry() {
 function chatTouchLock(on) {
   if (on === !!S.lock) return; S.lock = on;
   if (on) {
-    S.ts = e => { S.y0 = e.touches[0].clientY; dbgStart(e); };
+    S.ts = e => { S.y0 = e.touches[0].clientY; S.kbDis = false; dbgStart(e); };
     S.tm = e => {
       const t = e.target, l = $('#chatlog'), dy = e.touches[0].clientY - S.y0; let why = '';
+      if (dy > 36 && !S.kbDis && $('#app').classList.contains('kbopen')) { S.kbDis = true; kbClose(); } // vuốt xuống: cất bàn phím
       if (t.closest && t.closest('textarea') && t.scrollHeight > t.clientHeight + 1) why = '';
       else if (t.closest && t.closest('.dbg')) return;
       else if (!l || !(t.closest && t.closest('.chat-log'))) why = 'ngoài log';
@@ -793,7 +798,7 @@ function dbgEv(k, s) {
 function dbgRender() {
   const p = $('#dbg'), l = $('#chatlog'); if (!p || !l) return;
   const vv = window.visualViewport, a = document.activeElement;
-  p.querySelector('.dbg-s').innerHTML = `v30 · log SH ${l.scrollHeight} CH ${l.clientHeight} ST ${Math.round(l.scrollTop)}<br>vv h ${vv ? Math.round(vv.height) : '-'} top ${vv ? Math.round(vv.offsetTop) : '-'} · scrollY ${Math.round(scrollY)} · innerH ${innerHeight} · tiêu điểm ${a && a !== document.body ? dbgDesc(a) : 'không'}`
+  p.querySelector('.dbg-s').innerHTML = `v31 · log SH ${l.scrollHeight} CH ${l.clientHeight} ST ${Math.round(l.scrollTop)}<br>vv h ${vv ? Math.round(vv.height) : '-'} top ${vv ? Math.round(vv.offsetTop) : '-'} · scrollY ${Math.round(scrollY)} · innerH ${innerHeight} · tiêu điểm ${a && a !== document.body ? dbgDesc(a) : 'không'}`
     + `<div class="dbg-ev">${DBG.ev.map(e => `<div><i>${e.t}${e.c > 1 ? '–' + e.t2 + ' ×' + e.c : ''}</i> ${e.s}</div>`).join('') || 'Chưa có sự kiện.'}</div>`;
 }
 function dbgApply() {
@@ -836,11 +841,15 @@ function dbgMount(sh) {
   });
   dbgEv('o', 'mở khung chat');
 }
+function kbClose() {
+  const q = $('#q'), app = $('#app'); q?.blur();
+  if (app.classList.contains('kbopen')) { S.kbHold = Date.now() + 700; app.classList.remove('kbopen'); app.style.setProperty('--kb', '0px'); }
+}
 function sendFromInput() {
   const q = $('#q'); if (!q) return;
   const text = (q.isContentEditable ? q.textContent : q.value).trim(); if (!text) return;
   if (q.isContentEditable) q.innerHTML = ''; else { q.value = ''; q.style.height = 'auto'; }
-  q.blur(); // gửi xong tự cất bàn phím
+  kbClose(); // gửi xong tự cất bàn phím
   sendMessage(text);
 }
 async function sendMessage(text) {
@@ -1348,15 +1357,13 @@ async function init() {
     const vv = window.visualViewport, app = $('#app');
     const vars = () => {
       const kb = Math.max(0, window.innerHeight - vv.height - vv.offsetTop), open = window.innerHeight - vv.height > 120;
+      if (open && S.kbHold > Date.now()) return false;
       app.style.setProperty('--kb', kb + 'px'); app.style.setProperty('--vvh', Math.round(vv.height) + 'px'); app.style.setProperty('--vvt', Math.round(vv.offsetTop) + 'px');
       app.classList.toggle('kbopen', open);
       return open;
     };
-    // đổi cỡ (bàn phím mở/đóng): cập nhật khung và cuộn xuống tin mới nhất
-    vv.addEventListener('resize', () => {
-      const open = vars();
-      if (S.chat) requestAnimationFrame(() => { const l = $('#chatlog'); if (l && open) l.scrollTop = l.scrollHeight; });
-    });
+    // đổi cỡ (bàn phím mở/đóng): cập nhật khung; danh sách tự giữ tin ở đáy nhờ ResizeObserver trong openEntry
+    vv.addEventListener('resize', vars);
     // dịch chuyển (kéo): chỉ cập nhật vị trí, tuyệt đối không cuộn danh sách để khỏi tranh với ngón tay
     vv.addEventListener('scroll', () => { vars(); if (S.chat && vv.offsetTop > 0.5) window.scrollTo(0, 0); });
   }

@@ -893,9 +893,6 @@ button,[data-act],input,textarea,select{touch-action:manipulation}
 #app.kbopen .sheet.chat{top:calc(var(--vvt,0px) + env(safe-area-inset-top,0px) + 6px);bottom:auto;max-height:none;height:calc(var(--vvh,600px) - env(safe-area-inset-top,0px) - 14px);transition:transform .5s cubic-bezier(.22,1,.36,1),opacity .22s ease,top .22s ease-out,height .22s ease-out}
 #app.kbopen .sheet:not(.chat){bottom:calc(8px + var(--kb,0px));max-height:calc(var(--vvh,600px) - env(safe-area-inset-top,0px) - 14px)}
 .sheet.chat .chat-in{padding-bottom:2px}
-#app.kbopen .cb-line em,#app.kbopen .cb-time{display:none}
-#app.kbopen .cb-me{padding:7px 12px;margin-top:3px}
-#app.kbopen .cb-ai{padding:8px 11px}
 
 
 /* khoảng cách giữa khung chat và thanh phụ bàn phím: sát hơn */
@@ -945,3 +942,7 @@ button,[data-act],input,textarea,select{touch-action:manipulation}
 .dbg-ev{margin-top:4px;padding-top:4px;border-top:1px solid rgba(127,127,127,.25)}
 .dbg-ev i{font-style:normal;opacity:.6}
 .dbg-ev b{color:var(--warn,#f2b552)}
+
+/* bàn phím mở/đóng: khung chat luôn neo theo đáy vùng nhìn. Mở thì bám ngay theo bàn phím (không trễ), đóng thì trượt xuống cùng bàn phím */
+#app.kbopen .sheet.chat{top:auto;bottom:var(--kb,0px);height:calc(var(--vvh,600px) - env(safe-area-inset-top,0px) - 4px)}
+.sheet.chat.on{transition:transform .5s cubic-bezier(.22,1,.36,1),opacity .22s ease,visibility 0s,bottom .34s cubic-bezier(.25,.9,.3,1),height .34s cubic-bezier(.25,.9,.3,1),border-radius .34s ease,padding .34s ease}
