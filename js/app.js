@@ -779,8 +779,8 @@ function dbgRender() {
     DBG.raf = 0; const p = $('#dbg'), l = $('#chatlog'); if (!p || !l) return;
     const se = document.scrollingElement, cs = getComputedStyle(l), st = getComputedStyle(el.sheet), on = v => v ? 'bật' : 'tắt';
     const rows = DBG.hist.map(g => `<div>#${g.n} chạm <b>${g.tgt}</b>${g.hit !== g.tgt ? ' · điểm ' + g.hit : ''} · trong log ${g.inLog ? 'có' : '<b>KHÔNG</b>'}<br>&nbsp; kéo ${g.mv} lần · dy ${g.dy > 0 ? '+' : ''}${g.dy} · lần đầu <b>${g.first || '-'}</b> · chặn ${g.pv} · log cuộn ${g.ls} (ST ${g.st0}→${Math.round(l.scrollTop)}) · trang cuộn ${g.ds}</div>`).join('');
-    p.querySelector('.dbg-s').innerHTML = `v25 · log SH ${l.scrollHeight} CH ${l.clientHeight} ST ${Math.round(l.scrollTop)} · ov ${cs.overflowY} · ta ${cs.touchAction} · sheet ov ${st.overflowY}<br>kb ${getComputedStyle($('#app')).getPropertyValue('--kb').trim() || 0} · trang ST ${se ? Math.round(se.scrollTop) : 0} · innerH ${innerHeight}${rows || '<div>Kéo thử trong danh sách tin nhắn.</div>'}`;
-    p.querySelector('.dbg-b').innerHTML = [['nolock', 'Khoá chạm', !DBG.nolock], ['pan', 'pan-y', DBG.pan], ['mt', 'Neo đáy', DBG.mt], ['ovf', 'Sheet hidden', DBG.ovf]].map(([k, t, v]) => `<button data-dbg="${k}" class="${v ? 'on' : ''}">${t}: ${on(v)}</button>`).join('') + '<button data-dbg="re">Làm mới lớp cuộn</button><button data-dbg="off">Ẩn bảng</button>';
+    p.querySelector('.dbg-s').innerHTML = `v26 · log SH ${l.scrollHeight} CH ${l.clientHeight} ST ${Math.round(l.scrollTop)} · ov ${cs.overflowY} · ta ${cs.touchAction} · sheet ov ${st.overflowY}<br>kb ${getComputedStyle($('#app')).getPropertyValue('--kb').trim() || 0} · trang ST ${se ? Math.round(se.scrollTop) : 0} · innerH ${innerHeight}${rows || '<div>Kéo thử trong danh sách tin nhắn.</div>'}`;
+    p.querySelector('.dbg-b').innerHTML = [['nolock', 'Khoá chạm', !DBG.nolock], ['pan', 'pan-y', DBG.pan], ['mt', 'Neo đáy', DBG.mt], ['ovf', 'Sheet hidden', DBG.ovf]].map(([k, t, v]) => `<button data-dbg="${k}" class="${v ? 'on' : ''}">${t}: ${on(v)}</button>`).join('') + '<button data-dbg="fake">+15 tin thử</button><button data-dbg="re">Làm mới lớp cuộn</button><button data-dbg="off">Ẩn bảng</button>';
   });
 }
 function dbgApply() {
@@ -802,6 +802,12 @@ function dbgMount(sh) {
     const b = e.target.closest('[data-dbg]'); if (!b) return; const k = b.dataset.dbg;
     if (k === 'off') { DBG.on = false; try { localStorage.setItem('dbgScroll', '0'); } catch {} p.remove(); return; }
     if (k === 're') { const lg = $('#chatlog'); lg.style.overflowY = 'hidden'; void lg.offsetHeight; lg.style.overflowY = ''; }
+    else if (k === 'fake') {
+      // tin giả chỉ để có chỗ kéo thử: chỉ nằm trên màn hình, không lưu, đóng khung là mất
+      const lg = $('#chatlog'), f = document.createElement('div'); f.className = 'cb-fake';
+      f.innerHTML = Array.from({ length: 15 }, (_, i) => `<div class="cb-me">Tin thử ${i + 1}: ${20 + i * 5}k cơm trưa<span class="cb-time">thử</span></div><div class="cb-ai"><b>Tin thử, không lưu</b>Ăn uống · ${20 + i * 5}.000₫</div>`).join('');
+      lg.querySelector('.cb-empty')?.remove(); lg.prepend(f); lg.scrollTop = lg.scrollHeight;
+    }
     else DBG[k] = !DBG[k];
     dbgApply(); dbgRender();
   });

@@ -941,3 +941,4 @@ button,[data-act],input,textarea,select{touch-action:manipulation}
 .dbg-b button{font:inherit;font-size:10.5px;padding:4px 7px;border-radius:8px;border:1px solid rgba(127,127,127,.4);background:none;color:var(--fg)}
 .dbg-b button.on{background:color-mix(in srgb,var(--accent) 22%,transparent);border-color:color-mix(in srgb,var(--accent) 55%,transparent)}
 .chat-log.nomt>:first-child{margin-top:0}
+.cb-fake{display:flex;flex-direction:column;gap:6px}
