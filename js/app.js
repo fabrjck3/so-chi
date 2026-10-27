@@ -585,6 +585,9 @@ function renderSettings() {
   <div class="foot">Phím tắt trên iPhone trích sẵn ngày, số biến động và số dư rồi gửi lên Worker của riêng bạn. Nội dung giao dịch và số tài khoản không được gửi. ${s.lastSync ? 'Đồng bộ lần cuối: ' + new Date(s.lastSync).toLocaleString('vi-VN') : 'Chưa đồng bộ lần nào.'}</div>
   <div class="sec"><span>Giao diện</span></div>
   <div class="group">${row('Chế độ màu', sel('s-theme', 'theme', [['auto', 'Theo hệ thống'], ['light', 'Sáng'], ['dark', 'Tối']], s.theme))}</div>
+  <div class="sec"><span>Ứng dụng</span></div>
+  <div class="group">${act('Tải bản mới nhất', 'appupdate')}</div>
+  <div class="foot">Đang dùng bản <span id="appver">…</span>. Mỗi lần mở app tự kiểm tra bản mới; có bản mới ngay lúc mở thì tự tải lại, đang nhập dở thì hiện nút Tải lại.</div>
   <div class="sec"><span>Sao lưu</span></div>
   <div class="group">${act('Xuất JSON', 'export-json')}${act('Xuất CSV', 'export-csv')}${act('Nhập dữ liệu để khôi phục', 'import')}</div>
   <div class="foot">Dữ liệu nằm trên máy này. Sao lưu lần cuối: ${last}. Chọn "Lưu vào Tệp" để cất vào iCloud Drive.</div>
@@ -594,6 +597,8 @@ function renderSettings() {
   <div class="sec"><span>Dữ liệu</span></div>
   <div class="group">${act('Tạo dữ liệu mẫu', 'sample')}${act('Xoá dữ liệu mẫu', 'unsample')}${act('Xoá toàn bộ giao dịch', 'wipe', 'bad', '')}</div>
   <div class="foot">${S.tx.length} giao dịch · ${S.queue.length} câu chờ</div>`;
+  // Tên bộ nhớ đệm của service worker chính là số phiên bản (so-chi-vNN).
+  window.caches?.keys().then(k => { const v = k.filter(x => x.startsWith('so-chi-v')).sort((a, b) => parseInt(b.slice(8)) - parseInt(a.slice(8)))[0]; const e = $('#appver'); if (e) e.textContent = v ? v.slice(7) : 'chưa rõ'; }).catch(() => {});
 }
 
 const RENDER = { home: renderHome, log: renderLog, stats: renderStats, wallet: renderWallet, settings: renderSettings };
@@ -1326,6 +1331,12 @@ const ACT = {
   rdel: () => { const id = S.R.id; dialog('Xoá khoản định kỳ?', 'Các khoản đã ghi trong sổ vẫn giữ nguyên, chỉ dừng tạo khoản mới.', 'Xoá', async () => { S.set.recurring = S.set.recurring.filter(r => r.id !== id); await saveSet(); closeSheet(); renderAll(); toast('Đã xoá khoản định kỳ'); }, true); },
   rmanage: () => { setTab('settings'); setTimeout(() => $('#recur-card')?.scrollIntoView({ block: 'start' }), 50); },
   reload: () => location.reload(),
+  appupdate: async () => {
+    if (!navigator.onLine) { toast('Đang mất mạng, chưa tải được bản mới'); return; }
+    toast('Đang tải bản mới nhất...');
+    try { await S.reg?.update(); } catch {}
+    setTimeout(() => location.reload(), 400); // trang luôn lấy file mới từ máy chủ nên tải lại là đủ
+  },
   syncnow: () => syncInbox(true),
   monthgo: () => { S.lm = 'month'; S.lmk = mkey(new Date()); S.lcat = ''; S.q = ''; renderLog(); setTab('log'); },
   goq: () => $('#pending')?.scrollIntoView({ behavior: 'smooth', block: 'center' }),
@@ -1550,14 +1561,20 @@ async function init() {
   // Sao lưu Telegram: lúc mở app, lúc rời app, và mỗi 10 phút khi đang dùng; chỉ gửi khi sổ đã đổi.
   setTimeout(tgBackup, 3000); setInterval(() => { if (!document.hidden) tgBackup(); }, 10 * 60 * 1000);
   if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
+    // Cập nhật: mỗi lần mở app hỏi máy chủ có bản mới không (sw.js đổi VERSION). Bản mới tới ngay lúc
+    // vừa mở và không đang làm dở gì thì tải lại luôn; đang nhập dở thì hiện nút "Tải lại" như cũ.
     const had = !!navigator.serviceWorker.controller;
+    let shownAt = Date.now();
+    const idle = () => !el.sheet.classList.contains('on') && !document.activeElement?.matches?.('input,textarea,select,[contenteditable]');
     navigator.serviceWorker.register('sw.js').then(reg => {
+      S.reg = reg;
       const check = () => reg.update().catch(() => {});
-      document.addEventListener('visibilitychange', () => { if (!document.hidden) check(); });
+      document.addEventListener('visibilitychange', () => { if (!document.hidden) { shownAt = Date.now(); check(); } });
       setInterval(check, 30 * 60 * 1000);
     }).catch(() => {});
     navigator.serviceWorker.addEventListener('controllerchange', () => {
       if (!had) return;
+      if (Date.now() - shownAt < 8000 && idle()) { location.reload(); return; }
       el.toast.innerHTML = '<span>Có bản mới</span><button data-act="reload">Tải lại</button>';
       el.toast.classList.add('on'); clearTimeout(toastT);
     });
