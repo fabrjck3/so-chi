@@ -562,7 +562,7 @@ function renderSettings() {
   S.pill.settings = 'Cài đặt';
   const last = s.lastBackup ? new Date(s.lastBackup).toLocaleDateString('vi-VN') : 'chưa lần nào';
   const row = (label, inner) => `<label class="srow"><span>${label}</span>${inner}</label>`;
-  const act = (label, a, cls = '', right = '›') => `<button class="srow act ${cls}" data-act="${a}">${label}<span class="chev">${right}</span></button>`;
+  const act = (label, a, cls = '', right = '›') => `<button type="button" class="srow act ${cls}" data-act="${a}">${label}<span class="chev">${right}</span></button>`;
   const sel = (id, k, opts, cur) => `<select id="${id}" data-set="${k}">${opts.map(([v, l]) => `<option value="${v}" ${v === cur ? 'selected' : ''}>${l}</option>`).join('')}</select>`;
   el.settings.innerHTML = `<h1>Cài đặt</h1>
   <div class="sec"><span>Ngân sách</span></div>
@@ -589,7 +589,7 @@ function renderSettings() {
   <div class="group">${act('Xuất JSON', 'export-json')}${act('Xuất CSV', 'export-csv')}${act('Nhập dữ liệu để khôi phục', 'import')}</div>
   <div class="foot">Dữ liệu nằm trên máy này. Sao lưu lần cuối: ${last}. Chọn "Lưu vào Tệp" để cất vào iCloud Drive.</div>
   <div class="sec"><span>Sao lưu tự động qua Telegram</span></div>
-  <div class="group">${row('Mã bot', `<input id="s-tgtok" type="text" class="secret" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-set="tg.token" value="${esc(s.tg.token)}" placeholder="từ @BotFather">`)}${row('Mật khẩu sao lưu', `<input id="s-tgpass" type="text" class="secret" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-set="tg.pass" value="${esc(s.tg.pass)}" placeholder="nên đặt">`)}${act(s.tg.chat ? 'Kết nối lại' : 'Kết nối', 'tgconnect')}${s.tg.chat ? act('Gửi bản sao lưu ngay', 'tgsend') : ''}</div>
+  <form class="group" id="tgform" action="#" autocomplete="on"><input class="vh" type="text" name="username" autocomplete="username" value="Sổ Chi – sao lưu" readonly tabindex="-1" aria-hidden="true">${row('Mã bot', `<input id="s-tgtok" type="text" class="secret" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-set="tg.token" value="${esc(s.tg.token)}" placeholder="từ @BotFather">`)}${row('Mật khẩu sao lưu', `<input id="s-tgpass" type="password" name="password" autocomplete="current-password" autocorrect="off" autocapitalize="off" spellcheck="false" data-set="tg.pass" value="${esc(s.tg.pass)}" placeholder="nên đặt">`)}<button type="submit" class="srow act">Lưu mật khẩu vào iPhone<span class="chev">›</span></button>${act('Chép mật khẩu', 'tgcopy')}${act(s.tg.chat ? 'Kết nối lại' : 'Kết nối', 'tgconnect')}${s.tg.chat ? act('Gửi bản sao lưu ngay', 'tgsend') : ''}</form>
   <div class="foot" id="tgmsg">${s.tg.err ? `<span class="bad">Lần gửi gần nhất lỗi: ${esc(s.tg.err)}.</span> ` : ''}${s.tg.chat ? (s.tg.lastAt ? 'Đã gửi lần cuối: ' + new Date(s.tg.lastAt).toLocaleString('vi-VN') + '. ' : 'Đã kết nối, chưa gửi bản nào. ') : 'Tạo bot ở @BotFather, bấm Start trong bot, dán mã bot rồi bấm Kết nối. '}Mỗi khi mở app, nếu sổ có thay đổi, bot gửi cho bạn một file sao lưu. Có mật khẩu thì file được khoá trên máy trước khi gửi; quên mật khẩu thì không mở được file. Mã bot và mật khẩu chỉ lưu trên máy này.</div>
   <div class="sec"><span>Dữ liệu</span></div>
   <div class="group">${act('Tạo dữ liệu mẫu', 'sample')}${act('Xoá dữ liệu mẫu', 'unsample')}${act('Xoá toàn bộ giao dịch', 'wipe', 'bad', '')}</div>
@@ -1394,6 +1394,7 @@ const ACT = {
       tgBackup(true);
     } catch (e) { m.innerHTML = `<span class="bad">${esc(e.message)}</span>`; }
   },
+  tgcopy: async () => { if (!S.set.tg.pass) { toast('Chưa có mật khẩu'); return; } try { await navigator.clipboard.writeText(S.set.tg.pass); toast('Đã chép mật khẩu, dán vào app Mật khẩu hoặc Ghi chú'); } catch { toast('Không chép được'); } },
   tgsend: async () => { if (!tgReady()) { toast('Bấm Kết nối trước'); return; } toast('Đang gửi...'); toast(await tgBackup(true) ? 'Đã gửi bản sao lưu' : 'Chưa gửi được: ' + (S.set.tg.err || 'chưa có dữ liệu thật')); },
   schedok: async () => { S.set.schedCheckAt = Date.now(); await saveSet(); renderHome(); toast('Đã ghi nhận, sẽ nhắc lại sau'); },
   'export-json': () => doExport('json'),
@@ -1427,6 +1428,16 @@ document.addEventListener('input', e => {
   if (t.dataset.f) fieldChange(t, false);
   else if (t.dataset.r) rField(t, false);
   else if (t.dataset.q !== undefined) { S.q = t.value; const l = $('#loglist'); if (l) l.innerHTML = logMonthList(); }
+});
+// Form mật khẩu sao lưu: bấm "Lưu mật khẩu vào iPhone" là một lần gửi form có tên + mật khẩu,
+// để iOS hỏi lưu vào app Mật khẩu. Vẽ lại form sau khi gửi (Safari coi form biến mất là đăng nhập xong).
+document.addEventListener('submit', async e => {
+  if (e.target.id !== 'tgform') return;
+  e.preventDefault();
+  const v = $('#s-tgpass').value.trim();
+  if (v !== S.set.tg.pass) { S.set.tg.pass = v; S.set.tg.lastSig = ''; await saveSet(); }
+  document.activeElement?.blur();
+  setTimeout(() => { renderSettings(); toast(v ? 'Đã lưu. Nếu iPhone hỏi lưu mật khẩu, chọn Lưu' : 'Chưa có mật khẩu'); }, 300);
 });
 document.addEventListener('change', async e => {
   const t = e.target;
