@@ -2,6 +2,7 @@
 import * as DB from './db.js';
 import { parseLocal, parseBankSMS, amountFromText, norm, ymd } from './parse.js';
 import { parseWithAI, testKey } from './ai.js';
+import { lock, unlock, sig, findChat, sendText, sendFile } from './backup.js';
 import { fetchInbox, ackInbox } from './sync.js';
 
 /* ---------- tiện ích ---------- */
@@ -45,6 +46,7 @@ const DEF_SET = {
   budget: 6000000, dailyBudget: 0, recurring: [], sync: { url: '', token: '' }, bankBal: null, lastBal: null, seen: [], lastSync: null, categories: DEF_CATS, open: { bank: 0, cash: 0 }, apiKey: '', model: 'claude-haiku-5-5',
   ai: true, autosave: true, altInput: false, usdVnd: 25500, price: { in: 0, out: 0 }, usage: {}, defWallet: 'cash', theme: 'auto', lastBackup: null, learned: {}, welcomed: false,
   schedCheckDays: 0, schedCheckAt: null,
+  tg: { token: '', chat: '', pass: '', lastAt: null, lastSig: '', err: '' },
 };
 
 const S = { lm: 'day', ld: ymd(new Date()), lmk: mkey(new Date()), lcat: '', q: '', tx: [], set: null, queue: [], tab: 'home', month: mkey(new Date()), wf: 'all', busy: false, C: null, pill: {} };
@@ -54,6 +56,7 @@ const el = {};
 async function load() {
   const [tx, meta, queue] = await Promise.all([DB.getAll('tx'), DB.get('meta', 'settings'), DB.getAll('queue')]);
   S.set = Object.assign(structuredClone(DEF_SET), meta || {});
+  S.set.tg = Object.assign(structuredClone(DEF_SET.tg), S.set.tg);
   const NEWC = Object.fromEntries(DEF_CATS.map(c => [c.name, c.color]));
   S.set.categories.forEach(c => { if (OLD_COLORS[c.name] === c.color || V2_COLORS[c.name] === c.color) c.color = NEWC[c.name]; });
   S.tx = tx; S.queue = queue.sort((a, b) => a.createdAt - b.createdAt);
@@ -265,6 +268,7 @@ function renderHome() {
 }
 function needBackup() {
   if (S.tx.length < 5 || S.tx.every(t => t.sample)) return false;
+  if (tgReady() && S.set.tg.lastAt && Date.now() - S.set.tg.lastAt < 7 * 864e5) return false;
   return !S.set.lastBackup || Date.now() - S.set.lastBackup > 7 * 864e5;
 }
 // Nhắc tự mở app ngân hàng xem lệnh chuyển tiền theo lịch còn chạy không (app không đọc được lệnh đó).
@@ -584,6 +588,9 @@ function renderSettings() {
   <div class="sec"><span>Sao lưu</span></div>
   <div class="group">${act('Xuất JSON', 'export-json')}${act('Xuất CSV', 'export-csv')}${act('Nhập dữ liệu để khôi phục', 'import')}</div>
   <div class="foot">Dữ liệu nằm trên máy này. Sao lưu lần cuối: ${last}. Chọn "Lưu vào Tệp" để cất vào iCloud Drive.</div>
+  <div class="sec"><span>Sao lưu tự động qua Telegram</span></div>
+  <div class="group">${row('Mã bot', `<input id="s-tgtok" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" data-set="tg.token" value="${esc(s.tg.token)}" placeholder="từ @BotFather">`)}${row('Mật khẩu sao lưu', `<input id="s-tgpass" type="password" autocomplete="new-password" autocapitalize="off" spellcheck="false" data-set="tg.pass" value="${esc(s.tg.pass)}" placeholder="nên đặt">`)}${act(s.tg.chat ? 'Kết nối lại' : 'Kết nối', 'tgconnect')}${s.tg.chat ? act('Gửi bản sao lưu ngay', 'tgsend') : ''}</div>
+  <div class="foot" id="tgmsg">${s.tg.err ? `<span class="bad">Lần gửi gần nhất lỗi: ${esc(s.tg.err)}.</span> ` : ''}${s.tg.chat ? (s.tg.lastAt ? 'Đã gửi lần cuối: ' + new Date(s.tg.lastAt).toLocaleString('vi-VN') + '. ' : 'Đã kết nối, chưa gửi bản nào. ') : 'Tạo bot ở @BotFather, bấm Start trong bot, dán mã bot rồi bấm Kết nối. '}Mỗi khi mở app, nếu sổ có thay đổi, bot gửi cho bạn một file sao lưu. Có mật khẩu thì file được khoá trên máy trước khi gửi; quên mật khẩu thì không mở được file. Mã bot và mật khẩu chỉ lưu trên máy này.</div>
   <div class="sec"><span>Dữ liệu</span></div>
   <div class="group">${act('Tạo dữ liệu mẫu', 'sample')}${act('Xoá dữ liệu mẫu', 'unsample')}${act('Xoá toàn bộ giao dịch', 'wipe', 'bad', '')}</div>
   <div class="foot">${S.tx.length} giao dịch · ${S.queue.length} câu chờ</div>`;
@@ -1146,8 +1153,7 @@ async function doExport(kind) {
   const stamp = ymd(new Date());
   let blob, name;
   if (kind === 'json') {
-    const { apiKey, sync, ...rest } = S.set;
-    blob = new Blob([JSON.stringify({ app: 'so-chi', version: 1, exportedAt: new Date().toISOString(), settings: rest, tx: S.tx }, null, 1)], { type: 'application/json' });
+    blob = new Blob([backupJSON()], { type: 'application/json' });
     name = `so-chi-${stamp}.json`;
   } else {
     const q = v => '"' + String(v ?? '').replace(/"/g, '""') + '"';
@@ -1168,10 +1174,41 @@ async function doExport(kind) {
   if (kind === 'json') { S.set.lastBackup = Date.now(); await saveSet(); renderHome(); renderSettings(); }
   toast('Đã xuất ' + name);
 }
+// Nội dung sao lưu: không có API key, mã đồng bộ và thông tin bot.
+function backupJSON() {
+  const { apiKey, sync, tg, ...rest } = S.set;
+  return JSON.stringify({ app: 'so-chi', version: 1, exportedAt: new Date().toISOString(), settings: rest, tx: S.tx }, null, 1);
+}
+// Chỉ gửi khi phần dữ liệu thật đổi (không tính giờ đồng bộ, lần sao lưu...).
+const dataSig = () => sig(JSON.stringify([S.tx, S.set.recurring, S.set.categories, S.set.budget, S.set.dailyBudget, S.set.open]));
+const tgReady = () => !!(S.set.tg.token && S.set.tg.chat);
+let tgBusy = false;
+async function tgBackup(force) {
+  const g = S.set.tg;
+  if (!tgReady() || tgBusy || !navigator.onLine || !S.tx.length || S.tx.every(t => t.sample)) return false;
+  const s = dataSig();
+  if (!force && s === g.lastSig) return false;
+  tgBusy = true;
+  try {
+    const now = new Date(), json = backupJSON();
+    const text = g.pass ? await lock(json, g.pass) : json;
+    const name = `so-chi-${ymd(now)}-${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}.json`;
+    await sendFile(g.token, g.chat, text, name, `Sổ Chi · ${S.tx.length} giao dịch · ${now.toLocaleString('vi-VN')}${g.pass ? ' · đã khoá bằng mật khẩu sao lưu' : ''}`);
+    Object.assign(g, { lastAt: Date.now(), lastSig: s, err: '' });
+    return true;
+  } catch (e) { g.err = e.message; return false; }
+  finally { tgBusy = false; await saveSet(); if (S.tab === 'settings') renderSettings(); }
+}
 async function onImportFile(file) {
   if (!file) return;
   try {
-    const data = JSON.parse(await file.text());
+    let data = JSON.parse(await file.text());
+    if (data.app === 'so-chi' && data.enc) {
+      const pass = S.set.tg.pass || prompt('Nhập mật khẩu sao lưu để mở file này');
+      if (!pass) return;
+      try { data = JSON.parse(await unlock(data, pass)); }
+      catch (e) { toast(e.message); return; }
+    }
     if (data.app !== 'so-chi' || !Array.isArray(data.tx)) throw new Error('bad');
     const ok = data.tx.filter(t => t && t.id && /^\d{4}-\d{2}-\d{2}$/.test(t.date) && t.amount > 0 && ['chi', 'thu', 'chuyen'].includes(t.type));
     S.pendingImport = { data, ok };
@@ -1181,7 +1218,7 @@ async function onImportFile(file) {
 async function doImport() {
   const { data, ok } = S.pendingImport; const key = S.set.apiKey;
   await DB.clear('tx'); await DB.putMany('tx', ok);
-  if (data.settings) { S.set = Object.assign(structuredClone(DEF_SET), data.settings, { apiKey: key, sync: S.set.sync }); await saveSet(); }
+  if (data.settings) { S.set = Object.assign(structuredClone(DEF_SET), data.settings, { apiKey: key, sync: S.set.sync, tg: S.set.tg }); await saveSet(); }
   await load(); applyTheme(); closeSheet(); renderAll(); toast(`Đã khôi phục ${ok.length} giao dịch`);
 }
 function sampleTx() {
@@ -1335,6 +1372,18 @@ const ACT = {
   unsample: async () => { const ids = S.tx.filter(t => t.sample).map(t => t.id); await DB.delMany('tx', ids); const qids = S.queue.filter(q => q.sample).map(q => q.id); if (qids.length) { await DB.delMany('queue', qids); S.queue = S.queue.filter(q => !q.sample); } S.set.recurring = S.set.recurring.filter(r => !r.sample); await saveSet(); await load(); renderAll(); toast(`Đã xoá ${ids.length} khoản mẫu`); },
   wipe: () => dialog('Xoá toàn bộ giao dịch?', 'Hành động này không hoàn tác được. Nên xuất JSON để sao lưu trước.', 'Xoá hết', async () => { await DB.clear('tx'); await DB.clear('queue'); await load(); closeSheet(); renderAll(); toast('Đã xoá'); }, true),
   'dlg-ok': () => S.dlg?.(),
+  tgconnect: async () => {
+    const g = S.set.tg, m = $('#tgmsg');
+    if (!g.token) { m.innerHTML = '<span class="bad">Dán mã bot trước.</span>'; return; }
+    m.textContent = 'Đang kết nối...';
+    try {
+      g.chat = await findChat(g.token);
+      await sendText(g.token, g.chat, 'Sổ Chi đã kết nối. Từ giờ bot sẽ gửi file sao lưu vào đây mỗi khi sổ có thay đổi.');
+      g.err = ''; g.lastSig = ''; await saveSet(); renderSettings(); toast('Đã kết nối, xem tin thử trong Telegram');
+      tgBackup(true);
+    } catch (e) { m.innerHTML = `<span class="bad">${esc(e.message)}</span>`; }
+  },
+  tgsend: async () => { if (!tgReady()) { toast('Bấm Kết nối trước'); return; } toast('Đang gửi...'); toast(await tgBackup(true) ? 'Đã gửi bản sao lưu' : 'Chưa gửi được: ' + (S.set.tg.err || 'chưa có dữ liệu thật')); },
   schedok: async () => { S.set.schedCheckAt = Date.now(); await saveSet(); renderHome(); toast('Đã ghi nhận, sẽ nhắc lại sau'); },
   'export-json': () => doExport('json'),
   'export-csv': () => doExport('csv'),
@@ -1381,6 +1430,7 @@ document.addEventListener('change', async e => {
     else if (k.startsWith('sync.')) S.set.sync[k.slice(5)] = String(v).trim();
     else if (k.startsWith('open.')) S.set.open[k.slice(5)] = v;
     else if (k === 'schedCheckDays') { S.set.schedCheckDays = +v || 0; S.set.schedCheckAt = Date.now(); }
+    else if (k.startsWith('tg.')) { S.set.tg[k.slice(3)] = String(v).trim(); if (k === 'tg.token') S.set.tg.chat = ''; if (k === 'tg.pass') S.set.tg.lastSig = ''; }
     else S.set[k] = typeof v === 'string' ? v.trim() : v;
     await saveSet();
     if (k === 'theme') applyTheme();
@@ -1464,9 +1514,11 @@ async function init() {
   if (TITLES[qs.get('tab')]) setTab(qs.get('tab'));
   if (nRec) toast(`Đã ghi ${nRec} khoản định kỳ đến hạn`);
   navigator.storage?.persist?.().catch(() => {});
-  window.addEventListener('online', () => { processQueue(); syncInbox(false); });
-  document.addEventListener('visibilitychange', () => { if (!document.hidden) { processQueue(); syncInbox(false); runRecurring().then(n => { renderAll(); if (n) toast(`Đã ghi ${n} khoản định kỳ đến hạn`); }); } });
+  window.addEventListener('online', () => { processQueue(); syncInbox(false); setTimeout(tgBackup, 3000); });
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) { processQueue(); syncInbox(false); runRecurring().then(n => { renderAll(); if (n) toast(`Đã ghi ${n} khoản định kỳ đến hạn`); }); setTimeout(tgBackup, 3000); } else tgBackup(); });
   processQueue(); syncInbox(false);
+  // Sao lưu Telegram: lúc mở app, lúc rời app, và mỗi 10 phút khi đang dùng; chỉ gửi khi sổ đã đổi.
+  setTimeout(tgBackup, 3000); setInterval(() => { if (!document.hidden) tgBackup(); }, 10 * 60 * 1000);
   if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
     const had = !!navigator.serviceWorker.controller;
     navigator.serviceWorker.register('sw.js').then(reg => {

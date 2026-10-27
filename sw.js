@@ -1,8 +1,8 @@
 // Service worker: ưu tiên mạng, mất mạng thì dùng bản đã lưu. Đổi VERSION mỗi lần sửa file để xoá cache cũ.
-const VERSION = 'so-chi-v44';
+const VERSION = 'so-chi-v45';
 const SHELL = [
   './', './index.html', './manifest.webmanifest', './css/app.css',
-  './js/app.js', './js/db.js', './js/parse.js', './js/ai.js', './js/sync.js',
+  './js/app.js', './js/db.js', './js/parse.js', './js/ai.js', './js/sync.js', './js/backup.js',
   './icons/icon.svg', './icons/app2-192.png', './icons/app2-512.png', './icons/app2-180.png',
 ];
 
