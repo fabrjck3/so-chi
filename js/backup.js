@@ -75,12 +75,18 @@ export async function getPinned(token, chat) {
   return (await call(token, 'getChat?chat_id=' + encodeURIComponent(chat))).pinned_message || null;
 }
 
-// Tải nội dung một file bot đã gửi (tối đa 20 MB). api.telegram.org/file cho phép trình duyệt đọc.
+export async function botName(token) {
+  return (await call(token, 'getMe')).username;
+}
+
+// Tải nội dung một file bot đã gửi (tối đa 20 MB). Trên iPhone thật, api.telegram.org/file KHÔNG cho
+// trình duyệt đọc (thiếu CORS ở file thật, chỉ trang lỗi mới có), nên lỗi này mang kind 'cors'
+// để app chuyển sang hướng dẫn tải tay. Cần Worker làm trung gian mới tự động được.
 export async function download(token, fileId) {
   const { file_path } = await call(token, 'getFile?file_id=' + encodeURIComponent(fileId));
   let res;
   try { res = await fetch(`https://api.telegram.org/file/bot${token.trim()}/${file_path}`); }
-  catch { throw new Error('Không tải được file từ Telegram'); }
+  catch { throw Object.assign(new Error('Không tải được file từ Telegram'), { kind: 'cors' }); }
   if (!res.ok) throw new Error('Telegram báo lỗi ' + res.status + ' khi tải file');
   return res.text();
 }

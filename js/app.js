@@ -2,7 +2,7 @@
 import * as DB from './db.js';
 import { parseLocal, parseBankSMS, amountFromText, norm, ymd } from './parse.js';
 import { parseWithAI, testKey } from './ai.js';
-import { lock, unlock, sig, findChat, sendText, editText, pin, getPinned, download, sendFile, replaceFile } from './backup.js';
+import { lock, unlock, sig, findChat, sendText, editText, pin, getPinned, download, botName, sendFile, replaceFile } from './backup.js';
 import { fetchInbox, ackInbox } from './sync.js';
 
 /* ---------- tiện ích ---------- */
@@ -1237,7 +1237,17 @@ async function tgRestore() {
     const at = p?.text?.lastIndexOf(TG_MARK) ?? -1;
     if (at < 0) throw new Error('Chưa thấy tin ghim "bản sao lưu mới nhất" trong chat với bot');
     const idx = JSON.parse(p.text.slice(at + TG_MARK.length));
-    const text = await download(g.token, idx.f);
+    let text;
+    try { text = await download(g.token, idx.f); }
+    catch (e) {
+      if (e.kind !== 'cors') throw e;
+      // Telegram không cho trình duyệt tải file: chỉ đường để tải tay bản đúng giờ.
+      const when = (p.text.split('\n')[1] || '').replace(/^Sổ Chi · /, '').replace(/ · đã khoá.*$/, '');
+      const user = await botName(g.token).catch(() => '');
+      Object.assign(g, { chat, index: p.message_id, slots: idx.s || [], next: idx.n || 0 }); await saveSet();
+      m.innerHTML = `Telegram không cho app tải file trực tiếp. Làm tay: mở chat với bot, chạm vào file sao lưu <b>${esc(when)}</b> → Chia sẻ → Lưu vào Tệp, rồi quay lại bấm <b>Nhập dữ liệu để khôi phục</b> ở mục Sao lưu.${user ? ` <a href="https://t.me/${esc(user)}" target="_blank" rel="noopener">Mở chat với bot</a>` : ''}`;
+      return;
+    }
     Object.assign(g, { chat, index: p.message_id, slots: idx.s || [], next: idx.n || 0, err: '' });
     await saveSet();
     m.textContent = 'Đã tải bản sao lưu.';
