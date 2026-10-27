@@ -329,6 +329,8 @@ h1{font-size:34px;font-weight:700;letter-spacing:-.02em;margin:4px 0 4px}
 .srow input:not([type=checkbox]):not([type=color]),.srow select{flex:1;min-width:0;border:0;background:transparent;text-align:right;text-align-last:right;color:var(--fg);font:inherit;padding:12px 0;outline:none;-webkit-appearance:none;appearance:none}
 .srow input::placeholder{color:var(--muted)}
 .srow input.grow{text-align:left}
+/* Ô bí mật: ô chữ thường che bằng chấm, để iOS không coi là mật khẩu và không bật "Use Strong Password". */
+.srow input.secret:not(:placeholder-shown){-webkit-text-security:disc}
 .srow input[type=checkbox]{accent-color:var(--accent);width:22px;height:22px;margin-left:auto}
 .srow .swatch{width:28px;height:28px}
 .srow.act{justify-content:space-between;color:var(--accent);font-weight:500}
