@@ -59,8 +59,18 @@ export async function sendText(token, chat, text) {
   await call(token, 'sendMessage', f);
 }
 
+// Gửi file thành tin mới, trả về mã tin để sau này thay file trong chính tin đó.
 export async function sendFile(token, chat, text, name, caption) {
   const f = new FormData(); f.append('chat_id', chat); f.append('caption', caption);
   f.append('document', new Blob([text], { type: 'application/json' }), name);
-  await call(token, 'sendDocument', f);
+  return (await call(token, 'sendDocument', f)).message_id;
+}
+
+// Thay file trong một tin bot đã gửi. Bot chỉ xoá được tin trong 48 giờ nhưng sửa được mãi,
+// nên giữ số bản cố định bằng cách thay vòng tròn thay vì gửi mới rồi xoá.
+export async function replaceFile(token, chat, msgId, text, name, caption) {
+  const f = new FormData(); f.append('chat_id', chat); f.append('message_id', msgId);
+  f.append('media', JSON.stringify({ type: 'document', media: 'attach://file', caption }));
+  f.append('file', new Blob([text], { type: 'application/json' }), name);
+  await call(token, 'editMessageMedia', f);
 }

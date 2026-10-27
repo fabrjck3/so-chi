@@ -2,7 +2,7 @@
 import * as DB from './db.js';
 import { parseLocal, parseBankSMS, amountFromText, norm, ymd } from './parse.js';
 import { parseWithAI, testKey } from './ai.js';
-import { lock, unlock, sig, findChat, sendText, sendFile } from './backup.js';
+import { lock, unlock, sig, findChat, sendText, sendFile, replaceFile } from './backup.js';
 import { fetchInbox, ackInbox } from './sync.js';
 
 /* ---------- tiện ích ---------- */
@@ -46,7 +46,7 @@ const DEF_SET = {
   budget: 6000000, dailyBudget: 0, recurring: [], sync: { url: '', token: '' }, bankBal: null, lastBal: null, seen: [], lastSync: null, categories: DEF_CATS, open: { bank: 0, cash: 0 }, apiKey: '', model: 'claude-haiku-5-5',
   ai: true, autosave: true, altInput: false, usdVnd: 25500, price: { in: 0, out: 0 }, usage: {}, defWallet: 'cash', theme: 'auto', lastBackup: null, learned: {}, welcomed: false,
   schedCheckDays: 0, schedCheckAt: null,
-  tg: { token: '', chat: '', pass: '', lastAt: null, lastSig: '', err: '' },
+  tg: { token: '', chat: '', pass: '', lastAt: null, lastSig: '', err: '', slots: [], next: 0 },
 };
 
 const S = { lm: 'day', ld: ymd(new Date()), lmk: mkey(new Date()), lcat: '', q: '', tx: [], set: null, queue: [], tab: 'home', month: mkey(new Date()), wf: 'all', busy: false, C: null, pill: {} };
@@ -1182,6 +1182,7 @@ function backupJSON() {
 // Chỉ gửi khi phần dữ liệu thật đổi (không tính giờ đồng bộ, lần sao lưu...).
 const dataSig = () => sig(JSON.stringify([S.tx, S.set.recurring, S.set.categories, S.set.budget, S.set.dailyBudget, S.set.open]));
 const tgReady = () => !!(S.set.tg.token && S.set.tg.chat);
+const TG_KEEP = 3;
 let tgBusy = false;
 async function tgBackup(force) {
   const g = S.set.tg;
@@ -1193,7 +1194,15 @@ async function tgBackup(force) {
     const now = new Date(), json = backupJSON();
     const text = g.pass ? await lock(json, g.pass) : json;
     const name = `so-chi-${ymd(now)}-${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}.json`;
-    await sendFile(g.token, g.chat, text, name, `Sổ Chi · ${S.tx.length} giao dịch · ${now.toLocaleString('vi-VN')}${g.pass ? ' · đã khoá bằng mật khẩu sao lưu' : ''}`);
+    const cap = `Sổ Chi · ${S.tx.length} giao dịch · ${now.toLocaleString('vi-VN')}${g.pass ? ' · đã khoá bằng mật khẩu sao lưu' : ''}`;
+    // Giữ TG_KEEP tin trong chat: chưa đủ thì gửi mới, đủ rồi thì thay file trong tin cũ nhất.
+    if (g.slots.length < TG_KEEP) g.slots.push(await sendFile(g.token, g.chat, text, name, cap));
+    else {
+      const i = g.next % g.slots.length;
+      try { await replaceFile(g.token, g.chat, g.slots[i], text, name, cap); }
+      catch { g.slots[i] = await sendFile(g.token, g.chat, text, name, cap); } // tin đã bị xoá tay: gửi tin mới vào ô đó
+      g.next = (i + 1) % g.slots.length;
+    }
     Object.assign(g, { lastAt: Date.now(), lastSig: s, err: '' });
     return true;
   } catch (e) { g.err = e.message; return false; }
@@ -1377,7 +1386,9 @@ const ACT = {
     if (!g.token) { m.innerHTML = '<span class="bad">Dán mã bot trước.</span>'; return; }
     m.textContent = 'Đang kết nối...';
     try {
-      g.chat = await findChat(g.token);
+      const chat = await findChat(g.token);
+      if (chat !== g.chat) { g.slots = []; g.next = 0; }
+      g.chat = chat;
       await sendText(g.token, g.chat, 'Sổ Chi đã kết nối. Từ giờ bot sẽ gửi file sao lưu vào đây mỗi khi sổ có thay đổi.');
       g.err = ''; g.lastSig = ''; await saveSet(); renderSettings(); toast('Đã kết nối, xem tin thử trong Telegram');
       tgBackup(true);
@@ -1430,7 +1441,12 @@ document.addEventListener('change', async e => {
     else if (k.startsWith('sync.')) S.set.sync[k.slice(5)] = String(v).trim();
     else if (k.startsWith('open.')) S.set.open[k.slice(5)] = v;
     else if (k === 'schedCheckDays') { S.set.schedCheckDays = +v || 0; S.set.schedCheckAt = Date.now(); }
-    else if (k.startsWith('tg.')) { S.set.tg[k.slice(3)] = String(v).trim(); if (k === 'tg.token') S.set.tg.chat = ''; if (k === 'tg.pass') S.set.tg.lastSig = ''; }
+    else if (k.startsWith('tg.')) {
+      const f = k.slice(3), nv = String(v).trim(), changed = S.set.tg[f] !== nv;
+      S.set.tg[f] = nv;
+      if (changed && f === 'token') S.set.tg.chat = '';
+      if (changed && f === 'pass') S.set.tg.lastSig = '';
+    }
     else S.set[k] = typeof v === 'string' ? v.trim() : v;
     await saveSet();
     if (k === 'theme') applyTheme();
