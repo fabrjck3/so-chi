@@ -56,14 +56,41 @@ export async function findChat(token) {
 
 export async function sendText(token, chat, text) {
   const f = new FormData(); f.append('chat_id', chat); f.append('text', text);
-  await call(token, 'sendMessage', f);
+  return (await call(token, 'sendMessage', f)).message_id;
 }
 
-// Gửi file thành tin mới, trả về mã tin để sau này thay file trong chính tin đó.
+export async function editText(token, chat, msgId, text) {
+  const f = new FormData(); f.append('chat_id', chat); f.append('message_id', msgId); f.append('text', text);
+  await call(token, 'editMessageText', f);
+}
+
+export async function pin(token, chat, msgId) {
+  const f = new FormData(); f.append('chat_id', chat); f.append('message_id', msgId); f.append('disable_notification', 'true');
+  await call(token, 'pinChatMessage', f);
+}
+
+// Tin đang ghim trong chat (tin "mục lục" ghi bản sao lưu mới nhất). Bot không đọc được lịch sử chat,
+// nên đây là cách duy nhất để máy mới biết file nào là bản mới nhất.
+export async function getPinned(token, chat) {
+  return (await call(token, 'getChat?chat_id=' + encodeURIComponent(chat))).pinned_message || null;
+}
+
+// Tải nội dung một file bot đã gửi (tối đa 20 MB). api.telegram.org/file cho phép trình duyệt đọc.
+export async function download(token, fileId) {
+  const { file_path } = await call(token, 'getFile?file_id=' + encodeURIComponent(fileId));
+  let res;
+  try { res = await fetch(`https://api.telegram.org/file/bot${token.trim()}/${file_path}`); }
+  catch { throw new Error('Không tải được file từ Telegram'); }
+  if (!res.ok) throw new Error('Telegram báo lỗi ' + res.status + ' khi tải file');
+  return res.text();
+}
+
+// Gửi file thành tin mới, trả về mã tin (để sau này thay file trong chính tin đó) và mã file.
 export async function sendFile(token, chat, text, name, caption) {
   const f = new FormData(); f.append('chat_id', chat); f.append('caption', caption);
   f.append('document', new Blob([text], { type: 'application/json' }), name);
-  return (await call(token, 'sendDocument', f)).message_id;
+  const m = await call(token, 'sendDocument', f);
+  return { id: m.message_id, fileId: m.document?.file_id };
 }
 
 // Thay file trong một tin bot đã gửi. Bot chỉ xoá được tin trong 48 giờ nhưng sửa được mãi,
@@ -72,5 +99,5 @@ export async function replaceFile(token, chat, msgId, text, name, caption) {
   const f = new FormData(); f.append('chat_id', chat); f.append('message_id', msgId);
   f.append('media', JSON.stringify({ type: 'document', media: 'attach://file', caption }));
   f.append('file', new Blob([text], { type: 'application/json' }), name);
-  await call(token, 'editMessageMedia', f);
+  return (await call(token, 'editMessageMedia', f)).document?.file_id;
 }

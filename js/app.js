@@ -2,7 +2,7 @@
 import * as DB from './db.js';
 import { parseLocal, parseBankSMS, amountFromText, norm, ymd } from './parse.js';
 import { parseWithAI, testKey } from './ai.js';
-import { lock, unlock, sig, findChat, sendText, sendFile, replaceFile } from './backup.js';
+import { lock, unlock, sig, findChat, sendText, editText, pin, getPinned, download, sendFile, replaceFile } from './backup.js';
 import { fetchInbox, ackInbox } from './sync.js';
 
 /* ---------- tiện ích ---------- */
@@ -46,7 +46,7 @@ const DEF_SET = {
   budget: 6000000, dailyBudget: 0, recurring: [], sync: { url: '', token: '' }, bankBal: null, lastBal: null, seen: [], lastSync: null, categories: DEF_CATS, open: { bank: 0, cash: 0 }, apiKey: '', model: 'claude-haiku-5-5',
   ai: true, autosave: true, altInput: false, usdVnd: 25500, price: { in: 0, out: 0 }, usage: {}, defWallet: 'cash', theme: 'auto', lastBackup: null, learned: {}, welcomed: false,
   schedCheckDays: 0, schedCheckAt: null,
-  tg: { token: '', chat: '', pass: '', lastAt: null, lastSig: '', err: '', slots: [], next: 0 },
+  tg: { token: '', chat: '', pass: '', lastAt: null, lastSig: '', err: '', slots: [], next: 0, index: null },
 };
 
 const S = { lm: 'day', ld: ymd(new Date()), lmk: mkey(new Date()), lcat: '', q: '', tx: [], set: null, queue: [], tab: 'home', month: mkey(new Date()), wf: 'all', busy: false, C: null, pill: {} };
@@ -592,7 +592,7 @@ function renderSettings() {
   <div class="group">${act('Xuất JSON', 'export-json')}${act('Xuất CSV', 'export-csv')}${act('Nhập dữ liệu để khôi phục', 'import')}</div>
   <div class="foot">Dữ liệu nằm trên máy này. Sao lưu lần cuối: ${last}. Chọn "Lưu vào Tệp" để cất vào iCloud Drive.</div>
   <div class="sec"><span>Sao lưu tự động qua Telegram</span></div>
-  <form class="group" id="tgform" action="#" autocomplete="on">${row('Mã bot', `<input id="s-tgtok" type="text" name="username" autocomplete="username" autocorrect="off" autocapitalize="off" spellcheck="false" data-set="tg.token" value="${esc(s.tg.token)}" placeholder="từ @BotFather">`)}${row('Mật khẩu sao lưu', `<input id="s-tgpass" type="password" name="password" autocomplete="current-password" autocorrect="off" autocapitalize="off" spellcheck="false" data-set="tg.pass" value="${esc(s.tg.pass)}" placeholder="nên đặt">`)}<button type="submit" class="srow act">Lưu mã bot + mật khẩu vào iPhone<span class="chev">›</span></button>${act('Chép mật khẩu', 'tgcopy')}${act(s.tg.chat ? 'Kết nối lại' : 'Kết nối', 'tgconnect')}${s.tg.chat ? act('Gửi bản sao lưu ngay', 'tgsend') : ''}</form>
+  <form class="group" id="tgform" action="#" autocomplete="on">${row('Mã bot', `<input id="s-tgtok" type="text" name="username" autocomplete="username" autocorrect="off" autocapitalize="off" spellcheck="false" data-set="tg.token" value="${esc(s.tg.token)}" placeholder="từ @BotFather">`)}${row('Mật khẩu sao lưu', `<input id="s-tgpass" type="password" name="password" autocomplete="current-password" autocorrect="off" autocapitalize="off" spellcheck="false" data-set="tg.pass" value="${esc(s.tg.pass)}" placeholder="nên đặt">`)}<button type="submit" class="srow act">Lưu mã bot + mật khẩu vào iPhone<span class="chev">›</span></button>${act('Chép mật khẩu', 'tgcopy')}${act(s.tg.chat ? 'Kết nối lại' : 'Kết nối', 'tgconnect')}${s.tg.chat ? act('Gửi bản sao lưu ngay', 'tgsend') : ''}${act('Khôi phục từ Telegram', 'tgrestore')}</form>
   <div class="foot" id="tgmsg">${s.tg.err ? `<span class="bad">Lần gửi gần nhất lỗi: ${esc(s.tg.err)}.</span> ` : ''}${s.tg.chat ? (s.tg.lastAt ? 'Đã gửi lần cuối: ' + new Date(s.tg.lastAt).toLocaleString('vi-VN') + '. ' : 'Đã kết nối, chưa gửi bản nào. ') : 'Tạo bot ở @BotFather, bấm Start trong bot, dán mã bot rồi bấm Kết nối. '}Mỗi khi mở app, nếu sổ có thay đổi, bot gửi cho bạn một file sao lưu. Có mật khẩu thì file được khoá trên máy trước khi gửi; quên mật khẩu thì không mở được file. Mã bot và mật khẩu chỉ lưu trên máy này.</div>
   <div class="sec"><span>Dữ liệu</span></div>
   <div class="group">${act('Tạo dữ liệu mẫu', 'sample')}${act('Xoá dữ liệu mẫu', 'unsample')}${act('Xoá toàn bộ giao dịch', 'wipe', 'bad', '')}</div>
@@ -1201,22 +1201,55 @@ async function tgBackup(force) {
     const name = `so-chi-${ymd(now)}-${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}.json`;
     const cap = `Sổ Chi · ${S.tx.length} giao dịch · ${now.toLocaleString('vi-VN')}${g.pass ? ' · đã khoá bằng mật khẩu sao lưu' : ''}`;
     // Giữ TG_KEEP tin trong chat: chưa đủ thì gửi mới, đủ rồi thì thay file trong tin cũ nhất.
-    if (g.slots.length < TG_KEEP) g.slots.push(await sendFile(g.token, g.chat, text, name, cap));
+    let fileId;
+    if (g.slots.length < TG_KEEP) { const m = await sendFile(g.token, g.chat, text, name, cap); g.slots.push(m.id); fileId = m.fileId; }
     else {
       const i = g.next % g.slots.length;
-      try { await replaceFile(g.token, g.chat, g.slots[i], text, name, cap); }
-      catch { g.slots[i] = await sendFile(g.token, g.chat, text, name, cap); } // tin đã bị xoá tay: gửi tin mới vào ô đó
+      try { fileId = await replaceFile(g.token, g.chat, g.slots[i], text, name, cap); }
+      catch { const m = await sendFile(g.token, g.chat, text, name, cap); g.slots[i] = m.id; fileId = m.fileId; } // tin đã bị xoá tay: gửi tin mới vào ô đó
       g.next = (i + 1) % g.slots.length;
     }
     Object.assign(g, { lastAt: Date.now(), lastSig: s, err: '' });
+    await tgIndex(fileId, cap);
     return true;
   } catch (e) { g.err = e.message; return false; }
   finally { tgBusy = false; await saveSet(); if (S.tab === 'settings') renderSettings(); }
 }
-async function onImportFile(file) {
-  if (!file) return;
+// Tin "mục lục" được ghim: ghi mã file của bản mới nhất (và các ô) để máy mới tìm ra mà khôi phục.
+// Ghim một lần, các lần sau chỉ sửa chữ nên không tạo thêm tin.
+const TG_MARK = 'sochi:';
+async function tgIndex(fileId, cap) {
+  const g = S.set.tg;
+  if (!fileId) return;
+  const text = `Sổ Chi – bản sao lưu mới nhất\n${cap}\n\nĐừng xoá hay bỏ ghim tin này: app dùng nó để khôi phục từ Telegram.\n\n${TG_MARK}${JSON.stringify({ f: fileId, s: g.slots, n: g.next })}`;
+  try { if (g.index) { await editText(g.token, g.chat, g.index, text); return; } } catch {} // tin mục lục bị xoá: tạo lại
+  g.index = await sendText(g.token, g.chat, text);
+  await pin(g.token, g.chat, g.index);
+}
+async function tgRestore() {
+  const g = S.set.tg, m = $('#tgmsg');
+  g.token = $('#s-tgtok').value.trim() || g.token; g.pass = $('#s-tgpass').value.trim() || g.pass;
+  if (!g.token) { m.innerHTML = '<span class="bad">Dán mã bot trước.</span>'; return; }
+  m.textContent = 'Đang tìm bản sao lưu trong Telegram...';
   try {
-    let data = JSON.parse(await file.text());
+    const chat = g.chat || await findChat(g.token);
+    const p = await getPinned(g.token, chat);
+    const at = p?.text?.lastIndexOf(TG_MARK) ?? -1;
+    if (at < 0) throw new Error('Chưa thấy tin ghim "bản sao lưu mới nhất" trong chat với bot');
+    const idx = JSON.parse(p.text.slice(at + TG_MARK.length));
+    const text = await download(g.token, idx.f);
+    Object.assign(g, { chat, index: p.message_id, slots: idx.s || [], next: idx.n || 0, err: '' });
+    await saveSet();
+    m.textContent = 'Đã tải bản sao lưu.';
+    await importText(text, true);
+  } catch (e) { m.innerHTML = `<span class="bad">${esc(e.message)}</span>`; }
+}
+async function onImportFile(file) {
+  if (file) importText(await file.text());
+}
+async function importText(raw, fromTg) {
+  try {
+    let data = JSON.parse(raw);
     if (data.app === 'so-chi' && data.enc) {
       const pass = S.set.tg.pass || prompt('Nhập mật khẩu sao lưu để mở file này');
       if (!pass) return;
@@ -1225,15 +1258,17 @@ async function onImportFile(file) {
     }
     if (data.app !== 'so-chi' || !Array.isArray(data.tx)) throw new Error('bad');
     const ok = data.tx.filter(t => t && t.id && /^\d{4}-\d{2}-\d{2}$/.test(t.date) && t.amount > 0 && ['chi', 'thu', 'chuyen'].includes(t.type));
-    S.pendingImport = { data, ok };
-    dialog('Khôi phục dữ liệu?', `File có ${ok.length} giao dịch${data.exportedAt ? ' (sao lưu ' + new Date(data.exportedAt).toLocaleDateString('vi-VN') + ')' : ''}. Dữ liệu hiện tại (${S.tx.length} giao dịch) sẽ bị thay thế.`, 'Khôi phục', doImport, true);
+    S.pendingImport = { data, ok, fromTg };
+    dialog('Khôi phục dữ liệu?', `File có ${ok.length} giao dịch${data.exportedAt ? ' (sao lưu lúc ' + new Date(data.exportedAt).toLocaleString('vi-VN') + ')' : ''}. Dữ liệu hiện tại (${S.tx.length} giao dịch) sẽ bị thay thế.`, 'Khôi phục', doImport, true);
   } catch { toast('File không đúng định dạng của Sổ Chi'); }
 }
 async function doImport() {
-  const { data, ok } = S.pendingImport; const key = S.set.apiKey;
+  const { data, ok, fromTg } = S.pendingImport; const key = S.set.apiKey;
   await DB.clear('tx'); await DB.putMany('tx', ok);
   if (data.settings) { S.set = Object.assign(structuredClone(DEF_SET), data.settings, { apiKey: key, sync: S.set.sync, tg: S.set.tg }); await saveSet(); }
-  await load(); applyTheme(); closeSheet(); renderAll(); toast(`Đã khôi phục ${ok.length} giao dịch`);
+  await load();
+  if (fromTg) { S.set.tg.lastSig = dataSig(); await saveSet(); } // vừa lấy từ Telegram về thì khỏi gửi lại y hệt
+  applyTheme(); closeSheet(); renderAll(); toast(`Đã khôi phục ${ok.length} giao dịch`);
 }
 function sampleTx() {
   const now = new Date(), today = now.getDate();
@@ -1398,13 +1433,14 @@ const ACT = {
     m.textContent = 'Đang kết nối...';
     try {
       const chat = await findChat(g.token);
-      if (chat !== g.chat) { g.slots = []; g.next = 0; }
+      if (chat !== g.chat) { g.slots = []; g.next = 0; g.index = null; }
       g.chat = chat;
       await sendText(g.token, g.chat, 'Sổ Chi đã kết nối. Từ giờ bot sẽ gửi file sao lưu vào đây mỗi khi sổ có thay đổi.');
       g.err = ''; g.lastSig = ''; await saveSet(); renderSettings(); toast('Đã kết nối, xem tin thử trong Telegram');
       tgBackup(true);
     } catch (e) { m.innerHTML = `<span class="bad">${esc(e.message)}</span>`; }
   },
+  tgrestore: () => tgRestore(),
   tgcopy: async () => { if (!S.set.tg.pass) { toast('Chưa có mật khẩu'); return; } try { await navigator.clipboard.writeText(S.set.tg.pass); toast('Đã chép mật khẩu, dán vào app Mật khẩu hoặc Ghi chú'); } catch { toast('Không chép được'); } },
   tgsend: async () => { if (!tgReady()) { toast('Bấm Kết nối trước'); return; } toast('Đang gửi...'); toast(await tgBackup(true) ? 'Đã gửi bản sao lưu' : 'Chưa gửi được: ' + (S.set.tg.err || 'chưa có dữ liệu thật')); },
   schedok: async () => { S.set.schedCheckAt = Date.now(); await saveSet(); renderHome(); toast('Đã ghi nhận, sẽ nhắc lại sau'); },
