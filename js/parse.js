@@ -173,29 +173,43 @@ export function guessCategory(normText, ctx) {
   return { cat, known };
 }
 
-// Đọc tin nhắn biến động số dư của ngân hàng, hoàn toàn trên máy, không gọi API.
-// Mẫu: "Thời gian: 15/01/2000 / Tài khoản: ... / Giao dịch: -22,000 VND / Số dư hiện tại: ... / Nội dung: ..."
+// Đọc tin nhắn biến động số dư của ngân hàng, hoàn toàn trên máy, không gọi API. Hai kiểu tin:
+//  - Một dòng, cách nhau bằng "|" (VietinBank thật):
+//    "VietinBank:26/10/2026 20:22|TK:...|GD:-50,000 VND|SDC:1,458,839 VND|VA:...|ND:..."
+//  - Nhiều dòng: "Thời gian: 15/01/2000 / Tài khoản: ... / Giao dịch: -22,000 VND / Số dư hiện tại: ... / Nội dung: ..."
 // Chỉ lấy ngày, số tiền, chiều thu/chi và nội dung. Số tài khoản và số dư bị bỏ, không lưu.
-export function parseBankSMS(text, ctx) {
-  const blocks = text.normalize('NFC').split(/(?=^\s*th[oơờ]i gian\s*:)/im).filter(b => /giao d[iị]ch\s*:/i.test(norm(b)));
-  const items = [];
-  for (const b of blocks) {
+function smsRecords(text) {
+  const t = text.normalize('NFC'), out = [];
+  const line = /(?:^|\n)[^\n|]{0,30}?(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{2,4})[^\n|]*\|([^\n]*)/g;
+  for (let m; (m = line.exec(t));) {
+    const gd = /(?:^|\|)\s*GD\s*:\s*([+-]?)\s*([\d.,]+)/i.exec(m[4]);
+    if (!gd) continue;
+    out.push({ sign: gd[1], amt: gd[2], d: m[1], mo: m[2], y: m[3], note: /(?:^|\|)\s*ND\s*:\s*(.*)$/i.exec(m[4])?.[1] || '', all: norm(m[0]) });
+  }
+  if (out.length) return out;
+  for (const b of t.split(/(?=^\s*th[oơờ]i gian\s*:)/im).filter(b => /giao d[iị]ch\s*:/i.test(norm(b)))) {
     const n = norm(b);
     const am = /giao dich\s*:\s*([+-]?)\s*([\d.,]+)/.exec(n);
     if (!am) continue;
-    const amount = parseInt(am[2].replace(/[^\d]/g, ''), 10);
-    if (!(amount > 0)) continue;
-    const isIn = am[1] === '+' || (!am[1] && /\b(cong|nhan|\+)\b/.test(n));
     const dm = /thoi gian\s*:\s*[^\d]*(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{2,4})/.exec(n);
+    // nội dung: lấy từ chữ gốc để giữ dấu, cắt đến hết dòng
+    out.push({ sign: am[1], amt: am[2], d: dm?.[1], mo: dm?.[2], y: dm?.[3], note: /^\s*n[oộ]i dung\s*:\s*(.*)$/im.exec(b)?.[1] || '', all: n });
+  }
+  return out;
+}
+export function parseBankSMS(text, ctx) {
+  const items = [];
+  for (const r of smsRecords(text)) {
+    const amount = parseInt(r.amt.replace(/[^\d]/g, ''), 10);
+    if (!(amount > 0)) continue;
+    const isIn = r.sign === '+' || (!r.sign && /\b(cong|nhan|\+)\b/.test(r.all));
     let date = ymd(ctx.today);
-    if (dm) {
-      let y = parseInt(dm[3], 10); if (y < 100) y += 2000;
-      const d = new Date(y, parseInt(dm[2], 10) - 1, parseInt(dm[1], 10));
+    if (r.d) {
+      let y = parseInt(r.y, 10); if (y < 100) y += 2000;
+      const d = new Date(y, parseInt(r.mo, 10) - 1, parseInt(r.d, 10));
       if (!isNaN(d) && d <= new Date(ctx.today.getFullYear(), ctx.today.getMonth(), ctx.today.getDate() + 1)) date = ymd(d);
     }
-    // nội dung: lấy từ chữ gốc để giữ dấu, cắt đến hết dòng
-    const nm = /^\s*n[oộ]i dung\s*:\s*(.*)$/im.exec(b);
-    let note = nm ? nm[1].trim() : '';
+    let note = r.note.trim();
     note = note.replace(/\d{6,}/g, '').replace(/\s+/g, ' ').trim();
     if (/^x+$/i.test(note)) note = '';
     const g = isIn ? { cat: ctx.categories.some(c => c.name === 'Khác') ? 'Khác' : ctx.categories[0].name, known: true } : guessCategory(norm(note), ctx);
